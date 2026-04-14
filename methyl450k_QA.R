@@ -1,7 +1,7 @@
 ##########################################################################
 #                 QA Analysis illumina 450k beadchip
 ##########################################################################
-# 23 marzo 2026
+# 13 abril 2026
 # Arturo, BM
 
 # Cargar librerias
@@ -155,6 +155,10 @@ pvalues <- do.call(
   cbind,
   pvalues)
 
+# ¿Cuántos probes tiene al menos un pval > 0.01?
+sum(rowMeans(pvalues > 0.01) != 0, na.rm = TRUE) # [1] 121303 // Se deben eliminar todos estos probes
+
+
 # NAs en pvalues pueden asociarse a intensidades de señal
 # no detectadas
 sum(is.na(pvalues)) # [1] 1478
@@ -248,6 +252,16 @@ lapply(
   X = idats_raw, 
   FUN = sesameQC_plotRedGrnQQ,
 )
+dev.off()
+
+# Resumen qqplots
+pdf("RGratio_vs_RGdistortion_raw.pdf")
+plot(qc_statistics$RGratio, qc_statistics$RGdistort,
+     xlab="RG ratio (shift)",
+     ylab="RG distortion (curvature)",
+     pch=16)
+abline(h=0, lty=2)
+abline(v=1, lty=2)
 dev.off()
 
 
@@ -391,6 +405,9 @@ mean(is.na(betas_raw)) # [1] 4.111614e-06
 
 euc_distbetas_raw <- hclust(dist(t(betas_raw)))
 
+pdf("dendogram_betas_raw.pdf")
+plot(euc_distbetas_raw)
+dev.off()
 
 
 ##### 2.7 PCA de valores m
@@ -507,7 +524,7 @@ ggplot(
   geom_text() +
   xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
   ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
-  theme_bw() +
+  theme_classic() +
   ggtitle("PCA")
 dev.off()
   
@@ -530,640 +547,112 @@ Metadata_filtered_723 <- Metadata_filtered_723[match(x = sampleID_pca_m_raw, tab
 # Confirmar orden
 all(sampleID_pca_m_raw == Metadata_filtered_723$sampleID) # [1] TRUE :)
 
+all(pca_m_raw_df$sample == Metadata_filtered_723$sampleID) # [1] TRUE :)
+
 # Color en base a Batch
 pdf("pca_m_raw_filtered_batch.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$batch)
-)
+pca_m_raw_df %>% 
+      ggplot(mapping = aes(x = X, y = Y)
+      ) +
+      geom_point() +
+      aes(colour = as.factor(Metadata_filtered_723$batch)) +
+      scale_color_discrete(name = "Batch") +
+      xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+      ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+      theme_classic() +
+      ggtitle("PCA") +
+      stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$batch)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 # Color en base a sample plate
 pdf("pca_m_raw_filtered_SamplePlate.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$Sample_Plate)
-)
+pca_m_raw_df %>% 
+  ggplot(mapping = aes(x = X, y = Y)
+  ) +
+  geom_point() +
+  aes(colour = as.factor(Metadata_filtered_723$Sample_Plate)) +
+  scale_color_discrete(name = "Sample Plate") +
+  xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+  ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+  theme_classic() +
+  ggtitle("PCA") +
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$Sample_Plate)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 # Color en base a sentrixID
 pdf("pca_m_raw_filtered_SentrixID.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$Sentrix_ID)
-)
+pca_m_raw_df %>% 
+  ggplot(mapping = aes(x = X, y = Y)
+  ) +
+  geom_point() +
+  aes(colour = as.factor(Metadata_filtered_723$Sentrix_ID)) +
+  scale_color_discrete(guide = "none") +
+  xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+  ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+  theme_classic() +
+  ggtitle("PCA") +
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$Sentrix_ID)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 # Color en base a disease (ceradsc)
 pdf("pca_m_raw_filtered_disease.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$ceradsc)
-)
+pca_m_raw_df %>% 
+  ggplot(mapping = aes(x = X, y = Y)
+  ) +
+  geom_point() +
+  aes(colour = as.factor(Metadata_filtered_723$ceradsc)) +
+  scale_color_discrete(name = "Cerad") +
+  xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+  ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+  theme_classic() +
+  ggtitle("PCA") +
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$ceradsc)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 # Color en base a disease (braak)
 pdf("pca_m_raw_filtered_disease_braak.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$braaksc)
-)
+pca_m_raw_df %>% 
+  ggplot(mapping = aes(x = X, y = Y)
+  ) +
+  geom_point() +
+  aes(colour = as.factor(Metadata_filtered_723$braaksc)) +
+  scale_color_discrete(name = "Braak") +
+  xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+  ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+  theme_classic() +
+  ggtitle("PCA") +
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$braaksc)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 # Color en base al sexo
 pdf("pca_m_raw_filtered_msex.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$msex)
-)
+pca_m_raw_df %>% 
+  ggplot(mapping = aes(x = X, y = Y)
+  ) +
+  geom_point() +
+  aes(colour = as.factor(Metadata_filtered_723$msex)) +
+  scale_color_discrete(name = "Sex") +
+  xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+  ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+  theme_classic() +
+  ggtitle("PCA") +
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$msex)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 # Color en base a study: ROS-MAP
 pdf("pca_m_raw_filtered_study.pdf")
-plot(
-  x = pca_m_raw$x[,1],
-  y = pca_m_raw$x[,2],
-  col = as.factor(Metadata_filtered_723$Study)
-)
+pca_m_raw_df %>% 
+  ggplot(mapping = aes(x = X, y = Y)
+  ) +
+  geom_point() +
+  aes(colour = as.factor(Metadata_filtered_723$Study)) +
+  scale_color_discrete(name = "Study") +
+  xlab(paste("PC1 - ", pca_var_per[1], "%", sep = "")) +
+  ylab(paste("PC2 - ", pca_var_per[2], "%", sep = "")) +
+  theme_classic() +
+  ggtitle("PCA") +
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(Metadata_filtered_723$Study)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 
-
-#
-saveRDS(object = pca_m_raw, file = "pca_m_raw.rds", compress = "gzip")
-saveRDS(object = idats_raw, file = "idats_raw.rds", compress = "gzip")
-
-
-
-
-
-
-
-
-
-# Remover Batch effect (test)
-library(sva)
-
-batch <- metadata_filtered$batch
-
-
-mod <- NULL
-
-m_values_corrected <- ComBat(
-  dat = m_values_filtered[, valid],   # solo las 731 muestras
-  batch = batch,
-  mod = mod,
-  par.prior = TRUE,
-  prior.plots = FALSE
-)
-
-
-# PCA datos corregidos
-pca_noBatch <- prcomp(
-                  x = t(m_values_corrected), 
-             scale. = TRUE)
-
-
-
-# Volver a graficar
-pdf("pca_m_corrected.pdf")
-plot(
-  x = pca_noBatch$x[, 1],
-  y = pca_noBatch$x[, 2]
-)
-dev.off()
-
-
-pdf("pca_corrected_colBatch.pdf")
-plot(
-  x = pca_noBatch$x[, 1],
-  y = pca_noBatch$x[, 2],
-col = as.factor(metadata_filtered$batch)
-)
-dev.off()
-
-pdf("pca_corrected_colSamplePlate.pdf")
-plot(
-  x = pca_noBatch$x[, 1],
-  y = pca_noBatch$x[, 2],
-  col = as.factor(metadata_filtered$Sample_Plate)
-)
-dev.off()
-
-pdf("pca_corrected_colSentrixID.pdf")
-plot(
-  x = pca_noBatch$x[, 1],
-  y = pca_noBatch$x[, 2],
-  col = as.factor(metadata_filtered$Sentrix_ID)
-)
-dev.off()
-
-
-#
-
-
-
-#
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##################################
-# 450k BeadChip QC & Preprocessing
-##################################
-
-#Cargar librerías
-library(sesame)
-library(sesameData)
-library(ExperimentHub)
-library(dplyr)
-library(parallel)
-library(BiocParallel)
-
-# sesameDataCache("idatSignature")
-# sesameDataCache()
-
-#######################################
-#           QUALITY CONTROL
-#######################################
-
-#########################
-# Lectura Archivos IDAT
-#########################
-
-# # Descomentar para análisis formal !!
-#
-# # Extraer rutas de los archivos idat
-# all_prefixes <- sesame::searchIDATprefixes(
-#                     dir.name = "/STORAGE/csbig/multiomics-Arturo/methyl_data/"
-#                 )
-# 
-# # ¿Cuántos archivos son?
-# length(all_prefixes) # [1] 739 // x2 = 1478 archivos!
-
-#Lectura de archivos IDAT
-
-
-# TEST: UN SOLO CHIP
-# Probar con una solo chip:
-prefixes <- sesame::searchIDATprefixes(
-              dir.name = "/STORAGE/csbig/multiomics-Arturo/methyl_data/5772325072/")
-
-# Lectura de archivos IDAT correspondientes al chip 5772325072
-array_5772325072 <- bplapply(
-                          X = prefixes,
-                        FUN = readIDATpair, 
-                    BPPARAM = MulticoreParam(workers = 20)
-)
-
-# ¿Cuántos elementos tiene?
-length(array_5772325072) # [1] 6 // Son 6 muestras en este beadchip
-
-
-#########################
-# Quality control Metrics
-#########################
-
-# 1. Bisulfite conversion
-#########################
-
-# Nota: 
-# The closer the score to 1.0, the more complete the bisulfite conversion.
-bis_conversion <- bplapply(
-                    X = array_5772325072, 
-                  FUN = sesame::bisConversionControl, 
-              BPPARAM = MulticoreParam(workers = 20)
-              )
-
-# ¿La conversión de bisulfito en alguna muestra es menor que 1?
-sum(!bis_conversion > 1) # [1] 0, Conversión de bisulftio bueno :)
-
-
-
-# 2. Calcular métricas/estadísticas de control de
-#     calidad para cada muestra
-########################################
-#
-# La estadísticas incluyen:
-# --Detección de sondas (probe detection)
-# --Intensidades medias de señal (signal intensity)
-# --Número de sondas (Number of probes)
-# --Color del canal (Color Channel)
-# --Sesgos de fluoróforos Cys3/Cys5 (Dye bias)
-# --Métricas con valores beta (Beta value)
-#
-# El resultado es  una lista de métricas/estadísticas por muestra.
-
-
-# 2.1 Calcula estadísticas de control de calidad para cada muestra
-QC_stats_array_5772325072 <- bplapply(
-                                X = array_5772325072,
-                              FUN = sesame::sesameQC_calcStats,
-                          BPPARAM = MulticoreParam(workers = 20)
-                          )
-
-#Observar primer elemento de la lista
-QC_stats_array_5772325072[[1]] # Estadísticas de la muestra 1
-
-
-# 2.2. Extraer los resultados de QC
-get_stats_array_5772325072 <- lapply(
-                                 X = QC_stats_array_5772325072,
-                               FUN = sesameQC_getStats
-                              )
-
-get_stats_array_5772325072[1]
-
-
-# 2.3 Extraer métricas de utilidad, para cada muestra
-
-# Métricas de utilidad (selección personal)
-vec1 <- c(           "num_dt",       "frac_dt", "mean_intensity",
-          "mean_intensity_MU",       "mean_ii",   "mean_inb_grn", 
-               "mean_inb_red",  "mean_oob_grn",   "mean_oob_red",
-                 "num_probes", "num_probes_II",  "num_probes_IR", 
-              "num_probes_IG",          "medR",           "medG",
-                "frac_unmeth",     "frac_meth",         "num_na")
-
-# Función para extraer métricas de utilidad
-extract_metrics <- function(sample_stat){
-                      sample_stat[][vec1]
-                  }
-
-beadchip_statistics <- do.call(
-                          rbind,
-                          bplapply(
-                              X = get_stats_array_5772325072, 
-                            FUN = extract_metrics, 
-                        BPPARAM = MulticoreParam(workers = 20)
-                          )
-                       )
-beadchip_statistics <- as.data.frame(beadchip_statistics)
-
-View(beadchip_statistics)
-
-beadchip_statistics$num_dt <- as.numeric(beadchip_statistics$num_dt)
-beadchip_statistics$frac_dt <- as.numeric(beadchip_statistics$frac_dt)
-
-
-# 3. Gráfico de proporción de sondas exitosas por muestra
-pdf("beadchip_stats.pdf")
-hist(beadchip_statistics$frac_dt)
-dev.off()
-
-# 4. Gráfico Dye bias Q-Q plot
-pdf("qqplots_raw_data.pdf")
-lapply(
-   X = array_5772325072, 
- FUN = sesame::sesameQC_plotRedGrnQQ,
-)
-dev.off()
-
-# 5.Distribución de valores beta crudos
-pdf("Histogram_b_values_raw.pdf")
-apply(
-  X = raw_betas,
-  MARGIN = 2,
-  FUN = function(x){
-    hist(
-      x = x,
-      main = "Distribución de Valores Beta",
-      xlab = "Valores Beta",
-      ylab = "Frecuencia")}
-)
-dev.off()
-
-#AQUI TE QUEDASTEEE!!!
-
-# 6. PCA: Identificar efectos de lote, outliers, etc
-
-# 6.1 Extraer betas crudos
-raw_betas <- do.call(
-                cbind, 
-                lapply(
-                    X = array_5772325072, 
-                  FUN = sesame::getBetas
-                ) 
-              )
-# Extraer varianzas por sonda
-var_probes <- apply(
-                    X = t(raw_betas),
-               MARGIN = 2,
-                  FUN = var,
-                na.rm = TRUE)
-
-# Filtrar sondas con var ~ 0
-probes_filtered <- t(raw_betas)[, var_probes > 0.01]
-
-#Existen NAS, Nan, o inf ?
-sum(is.na(probes_filtered)) # [1] 12
-sum(is.nan(probes_filtered)) # [1] 0
-sum(is.infinite(probes_filtered)) # [1] 0
-
-# Filtrar Nas
-probes_filtered <- probes_filtered[, apply(probes_filtered, 2, function(x) all(is.finite(x)))]
-
-# PCA
-pca_raw_array_5772325072 <- prcomp(
-                                x = probes_filtered,
-                            scale = TRUE
-)
-
-pdf("pca_raw_array_5772325072.pdf")
-plot(
-  x = pca_raw_array_5772325072$x[ ,1],
-  y =  pca_raw_array_5772325072$x[ ,2]
-)
-dev.off()
-
-
-
-
-# Requiere paquete "pals"
-library(pals)
-plot_intenseVSBetas <- lapply(
-                          X = array_5772325072,
-                        FUN = sesameQC_plotIntensVsBetas
-                       )
-
-sesameQC_plotIntensVsBetas(sdf = array_5772325072[[1]])
-
-
-
-#######################################
-#       Preproccesing based in QC
-#######################################
-
-# Basado en: 
-# https://bioconductor.org/packages/release/bioc/vignettes/sesame/inst/doc/sesame.html#Data_Preprocessing
-
-# 1. Quality Mask: Marcar probes problemáticos
-array_5772325072_Q <- bplapply(
-                            X = array_5772325072,
-                          FUN = sesame::qualityMask, 
-                      BPPARAM = MulticoreParam(workers = 20)
-                      )
-
-sum(array_5772325072_Q[[1]]$mask) # [1] 64144 probes masked para la primer muestra
-
-# 2. Infer Color Channel: Inferir color del canal
-array_5772325072_QC <- bplapply(
-                            X = array_5772325072_Q,
-                          FUN = sesame::inferInfiniumIChannel, 
-                      BPPARAM = MulticoreParam(workers = 20)
-                      )
-
-# 3. Dye bias correction: Corrección de sesgo Cys3/Cys5
-array_5772325072_QCD <-  bplapply(
-                            X = array_5772325072_QC,
-                          FUN = sesame::dyeBiasNL, 
-                      BPPARAM = MulticoreParam(workers = 20)
-)
-
-# 4. pOOBAH: Detecta sondas que no supera la intensidad de background
-array_5772325072_QCDP <-   bplapply(
-                            X = array_5772325072_QCD,
-                          FUN = sesame::pOOBAH, 
-                      BPPARAM = MulticoreParam(workers = 20)
-)
-
-
-# 5. Noob: Background substraction (identificados en pOOBAH y QualityMask)
-# Creo que tmbn normaliza (revisar)
-array_5772325072_QCDPB <- bplapply(
-                            X = array_5772325072_QCDP,
-                          FUN = sesame::noob, 
-                      BPPARAM = MulticoreParam(workers = 20)
-                      )
-
-# Extraer valores beta
-
-processed_betas <-do.call(
-                    cbind, 
-                    lapply(
-                        X = array_5772325072_QCDPB, 
-                      FUN = sesame::getBetas
-                    ) 
-                  )
-
-#######################################
-#        QUALITY CONTROL after QC
-#######################################
-
-# 1. Bisulfite conversion
-#########################
-bis_conversion_afterQC <- bplapply(
-                            X = array_5772325072_QCDPB, 
-                          FUN = sesame::bisConversionControl, 
-                      BPPARAM = MulticoreParam(workers = 20)
-                      )
-
-# 2.1 Calcula estadísticas de control de calidad para cada muestra
-QC_stats_array_5772325072_afterQC <- bplapply(
-                                        X = array_5772325072_QCDPB,
-                                      FUN = sesame::sesameQC_calcStats,
-                                  BPPARAM = MulticoreParam(workers = 20)
-                                  )
-
-QC_stats_array_5772325072_afterQC[1]
-QC_stats_array_5772325072[1]
-
-# 4. Gráfico Dye bias Q-Q plot
-pdf("qqplots_processed_data.pdf")
-lapply(
-  X = array_5772325072_QCDPB, 
-  FUN = sesame::sesameQC_plotRedGrnQQ,
-)
-dev.off()
-
-
-
-# 5.Distriubución de valores beta
-pdf("Histogram_b_values_processed.pdf")
-apply(
-       X = processed_betas,
-  MARGIN = 2,
-     FUN = function(x){
-       hist(
-            x = x,
-         main = "Distribución de Valores Beta", 
-         xlab = "Valores Beta", 
-         ylab = "Frecuencia")}
-)
-dev.off()
-
-
-# PCA data processed
-
-# Extraer varianzas por sonda
-var_probes_processed <- apply(
-                          X = t(processed_betas),
-                     MARGIN = 2,
-                        FUN = var,
-                      na.rm = TRUE
-                     )
-
-# Filtrar sondas con var ~ 0
-probes_filtered <- t(processed_betas)[, var_probes_processed > 0.01]
-
-#Existen NAS, Nan, o inf ?
-sum(is.na(probes_filtered)) # [1] 12
-sum(is.nan(probes_filtered)) # [1] 0
-sum(is.infinite(probes_filtered)) # [1] 0
-
-# Filtrar Nas
-probes_filtered <- probes_filtered[, apply(probes_filtered, 2, function(x) all(is.finite(x)))]
-
-# PCA
-pca_processed_betas <- prcomp(
-  x = probes_filtered,
-  scale = TRUE
-)
-
-pdf("pca_processed_betas.pdf")
-plot(
-  x = pca_processed_betas$x[ ,1],
-  y =  pca_processed_betas$x[ ,2]
-)
-dev.off()
-
-
-# Generar metada_assay_bio_clinic
-
-dim(metadata_assay) # [1] 748  12
-dim(metadata_biospecimen) # [1] 748  20
-dim(metadata_clinic) # [1] 3584   18
-
-
-
-
-
-
-
-
-
-
-
-# A) mapeo metadata <--> IDAT: Se emparejan en base a la columna targetID
-
-# 
-# str(array_5772325072)
-# 
-# 
-# prefixes[1] # "5772325072_R01C02" // Primera muestra
-# 
-# # Extraer el primer elemento de array // Facilitar manipulación
-# sample_5772325072_R01C02 <- array_5772325072[["5772325072_R01C02"]]
-# 
-# # Observar data
-# View(sample_5772325072_R01C02)
-# 
-# # Dimensiones
-# dim(sample_5772325072_R01C02)
-# # [1] 486427      7 
-# 
-# # No concuerda con los IDs de metadata
-# length(metadata$TargetID) # [1] 420132
-# 
-# # ¿Cuáles no están en metadata y sí en idat?
-# 
-# metadata_ID <- metadata |>
-#   select(TargetID) |>
-#   unlist() |>
-#   as.vector()
-# 
-# only_in_metadata <- sample_5772325072_R01C02 |>
-#   filter(Probe_ID %in% metadata_ID)
-# 
-# # Estructura de la tr
-# str(sample_5772325072_R01C02)
-# # Classes ‘SigDF’ and 'data.frame':	486427 obs. of  7 variables:
-# #   $ Probe_ID: chr  "cg00000029" "cg00000108" "cg00000109" "cg00000165" ...
-# # $ MG      : int  NA NA NA NA NA NA NA NA NA 130 ...
-# # $ MR      : int  NA NA NA NA NA NA NA NA NA 338 ...
-# # $ UG      : int  2646 8171 3130 1200 4171 1666 6807 6369 1974 1334 ...
-# # $ UR      : int  2239 504 607 3766 645 654 2757 3377 8289 13714 ...
-# # $ col     : Factor w/ 3 levels "G","R","2": 3 3 3 3 3 3 3 3 3 2 ...
-# # $ mask    : logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-# # - attr(*, "msg")= chr "[2026-03-11 16:49:11.283059] IDAT platform: HM450"
-# # - attr(*, "platform")= chr "HM450"
-# # - attr(*, "controls")='data.frame':	848 obs. of  6 variables:
-# #   ..$ G   : int [1:848] 100 100 12493 100 517 398 29816 30168 27986 14795 ...
-# # ..$ R   : int [1:848] 19122 100 100 100 29898 31277 1818 1669 1811 606 ...
-# # ..$ col : int [1:848] 64 53 31 43 41 45 35 41 45 37 ...
-# # ..$ type: int [1:848] 64 53 31 43 41 45 35 41 45 37 ...
-# # ..$ NA  : chr [1:848] "Red" "Purple" "Green" "Blue" ...
-# # ..$ NA  : chr [1:848] "STAINING" "STAINING" "STAINING" "STAINING" ...
-# 
-# # Descripción:
-# # La tabla refleja las intensidades crudas por sonda GpG. 
-# # Cada fila es una sonda (probe) que mide la metilación en un sitio CpG.
-# 
-# # Descripción de columna:
-# # Probe_ID[char]: Identificador de la sonda. Ejemplos: cg00000029, cg00000108 (cada ID corresponde a una posición genómica específica, definida en metadata)
-# # MG[int]: Intensidad de fluorescencia para la sonda metilada medida en el canal verde.
-# # MR[int]: Intensidad de fluorescencia para la sonda metilada medida en el canal rojo.
-# # UG[int]: Intensidad de fluorescencia para la sonda no metilada medida en el canal verde.
-# # UR[int]: Intensidad de fluorescencia para la sonda no metilada medida en el canal rojo.
-# # col[factor]: Indica qué canal se usa para esa sonda (principal). Ejemplo: "G", "R", "2"
-# # mask[logic]: Indica si la sonda fue marcada como problemática.
-# 
-# 
-# sum(sample_5772325072_R01C02$mask) # [1] 0 // Se marcaron  sondas como problemáticas
-# 
-# unique(sample_5772325072_R01C02$col)
-# 
-# canal_2 <- sample_5772325072_R01C02 |>
-#   filter(col == 2) |>
-#   mutate(
-#     M = UG, # Para este caso, probablemente así sea en ROSMAP
-#     U = UR, # Para este caso, probablemente así sea en ROSMAP
-#     Beta = M / (M + U)
-#   )
-# 
-# betas_2 <- sesame::getBetas(sdf = canal_2)
-
-
-
-
-
-
-
-
-
-
+# Fin QA
