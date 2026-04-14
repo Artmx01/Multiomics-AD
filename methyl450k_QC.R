@@ -1,7 +1,7 @@
 ##########################################################################
 #                 QC Analysis illumina 450k beadchip
 ##########################################################################
-# 01 abril 2026
+# 13 abril 2026
 # Arturo, BM
 
 
@@ -12,7 +12,7 @@ library(BiocParallel)
 library(ggplot2)
 library(illuminaio)
 library(tidyverse)
-
+library(sva)
 
 # Previamente, revisar methyl450k_QA.R
 
@@ -142,7 +142,7 @@ sum(is.nan(betas_pro_685)) # [1] 0
 sum(is.infinite(betas_pro_685)) # [1] 0
 
 # ¿Cual es la proporción de NAs?
-mean(is.na(betas_pro_685))
+mean(is.na(betas_pro_685)) # [1] 0.1519189 // 15% de los datos
 
 # ¿Cuántas sondas tienen datos completos (no NAs)?
 sum(rowMeans(!is.na(betas_pro_685)) == 1) # [1] 375607 // de 486427
@@ -158,6 +158,20 @@ sum(is.na(betas_pro_685_filtered)) # [1] 0
 sum(is.nan(betas_pro_685_filtered)) # [1] 0
 sum(is.infinite(betas_pro_685_filtered)) # [1] 0
 
+# Identificar sondas que fallan en al menos 1% de las muestras (consideranddo pval > 0.01)
+bad_probes <- rownames(pvalues)[rowMeans(pvalues > 0.01) > 0.01]
+
+# ¿Cuántos bad probes son?
+length(bad_probes) # [1] 86773 // de 375607
+
+probes_all <- rownames(betas_pro_685_filtered)
+no_keep <- intersect(x = probes_all, y = bad_probes) # [1] 27170
+keep_probes <- !(probes_all %in% bad_probes)
+
+betas_pro_685_filtered_pval <- betas_pro_685_filtered[keep_probes, ]
+
+# Confirmar filtrado
+dim(betas_pro_685_filtered_pval) # [1] 348437    685 // Se eliminan 27170 probes
 
 
 ## 2. Sondas con mapeo a cromosomas sexuales
@@ -170,15 +184,15 @@ somatic_probes <- metadata %>%
   unlist() %>%
   as.vector()
 
-probes_betas_pro <- rownames(betas_pro_685_filtered)
+probes_betas_pro <- rownames(betas_pro_685_filtered_pval)
 
 keep_probes <- intersect(x = somatic_probes, y = probes_betas_pro)
 
 # Filtrar sondas con mapeo a cromosomas sexuales
-betas_pro_685_filtered_nosex <- betas_pro_685_filtered[keep_probes, ]
+betas_pro_685_filtered_pval_nosex <- betas_pro_685_filtered_pval[keep_probes, ]
 
 # Confirmar filtrado
-dim(betas_pro_685_filtered_nosex) # [1] 361580    685
+dim(betas_pro_685_filtered_pval_nosex) # [1] 335819    685 // Se eliminan 12618
 
 
 ## 3. Sondas con SNPs en el sitio CpG, cross-reactive:
@@ -205,14 +219,14 @@ bad_probes <- HM450.hg19.manifest.tsv %>%
 # ¿Cuántas bad_probes son?
 length(bad_probes) # [1] 60466
 
-probes_betas_pro <- rownames(betas_pro_685_filtered_nosex)
+probes_betas_pro <- rownames(betas_pro_685_filtered_pval_nosex)
 
 keep_probes <- !(probes_betas_pro %in% bad_probes)
 
-betas_pro_685_filtered_nosex_noSNP_noCrossreactive <- betas_pro_685_filtered_nosex[keep_probes, ]
+betas_pro_685_filtered_pval_nosex_noSNP_noCrossreactive <- betas_pro_685_filtered_pval_nosex[keep_probes, ]
 
 # Confirmar filtrado
-dim(betas_pro_685_filtered_nosex_noSNP_noCrossreactive) # [1] 361019    685 // se eliminaron 561 sondas
+dim(betas_pro_685_filtered_pval_nosex_noSNP_noCrossreactive) # [1] 335299    685 // se eliminaron 520 sondas
 
 
 
@@ -222,8 +236,8 @@ dim(betas_pro_685_filtered_nosex_noSNP_noCrossreactive) # [1] 361019    685 // s
 
 # Convertir beta values a m values
 m_values_pro<- BetaValueToMValue(
-  b = betas_pro_685_filtered_nosex_noSNP_noCrossreactive
-) 
+  b = betas_pro_685_filtered_pval_nosex_noSNP_noCrossreactive
+)
 
 # Eliminar muestra 5822038012_R02C01, contiene NA en metadata
 no_keep <- "5822038012_R02C01"
@@ -258,131 +272,4 @@ m_values_pro_684_noBatch <- ComBat(
 # FIN :)
 ###############
 
-
-
-
-# TEST PARA EVALUAR BATCH (PCA)
-# ESTO VA EN QA_post_QC
-
-
-# PCA datos corregidos
-pca_pro <- prcomp(
-                   x = t(m_values_pro_684_noBatch), 
-              scale. = TRUE)
-
-# Volver a graficar
-pdf("pca_m_pro.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2]
-)
-dev.off()
-
-# Confirmar orden entre muestras en PCA y metadata
-all(rownames(pca_pro$x) == metadata_filtered_684$sampleID) # [1] TRUE
-
-# Color batch
-pdf("pca_m_pro_batch.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$batch)
-)
-dev.off()
-
-# Color ceradsc
-pdf("pca_m_pro_ceradsc.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$ceradsc)
-)
-dev.off()
-
-# Color braaksc
-pdf("pca_m_pro_braaksc.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$braaksc)
-)
-dev.off()
-
-# Color msex
-pdf("pca_m_pro_msex.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$msex)
-)
-dev.off()
-
-# Color study
-pdf("pca_m_pro_study.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$Study)
-)
-dev.off()
-
-# Averigua en qué se están agrupando los datos, lunes
-
-
-
-pca_pro_var <- pca_pro$sdev^2
-
-pca_pro_var_per <- round(pca_pro_var / sum(pca_pro_var) * 100, 1)
-
-pdf("Scree_plot_pca_pro.pdf")
-barplot(height = pca_pro_var_per, main = "Scree plot", xlab = "Principal Component", ylab = "Percent Variation")
-dev.off()
-
-
-
-
-
-##########################################
-# Segunda prueba remover efecto lote
-mod2 <- model.matrix(~ apoe_genotype, data = metadata_filtered_684)
-
-m_values_pro_684_v2 <- ComBat(
-  dat = m_values_pro_684,
-  batch = batch, 
-  mod = mod2)
-
-
-# PCA datos corregidos
-pca_pro_v2 <- prcomp(
-  x = t(m_values_pro_684_v2), 
-  scale. = TRUE)
-
-# Volver a graficar
-pdf("pca_m_pro_v2.pdf")
-plot(
-  x = pca_pro_v2$x[, 1],
-  y = pca_pro_v2$x[, 2]
-)
-dev.off()
-
-
-######################
-# Versión 3
-mod3 <- NULL
-
-m_values_pro_684_v3 <- ComBat(
-  dat = m_values_pro_684,
-  batch = batch, 
-  mod = mod3)
-
-pca_pro_v3 <- prcomp(
-  x = t(m_values_pro_684_v3), 
-  scale. = TRUE)
-
-pdf("pca_m_pro_v3.pdf")
-plot(
-  x = pca_pro_v3$x[, 1],
-  y = pca_pro_v3$x[, 2]
-)
-dev.off()
 
