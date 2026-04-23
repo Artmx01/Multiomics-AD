@@ -401,15 +401,6 @@ mean(is.na(betas_raw)) # [1] 4.111614e-06
 
 
 
-#### Dendograma (clustering)
-
-euc_distbetas_raw <- hclust(dist(t(betas_raw)))
-
-pdf("dendogram_betas_raw.pdf")
-plot(euc_distbetas_raw)
-dev.off()
-
-
 ##### 2.7 PCA de valores m
 
 ## Filtrar muestras con mapeo a metadata (necesario para agg color)
