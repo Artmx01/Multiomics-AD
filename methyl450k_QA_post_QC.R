@@ -99,136 +99,132 @@ dev.off()
 
 ## PCA 
 
-# PCA datos corregidos
-pca_pro <- prcomp(
-  x = t(m_values_pro_684_noBatch), 
-  scale. = TRUE)
-
-# Volver a graficar
-pdf("pca_m_pro.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2]
-)
-dev.off()
-
-# Formato para ggplot
-pca_m_pro_df <- data.frame(
-  sample = rownames(pca_pro$x),
-  X = pca_pro$x[,1],
-  Y = pca_pro$x[,2]
+# PCA de valores corregidos
+pca_corrected_data <- prcomp(
+  x = t(data_corrected),
+  scale. = TRUE
 )
 
-pca_pro_var <- pca_pro$sdev^2
+# Transformar datos para ggplot
+pca_corrected_data_df <- data.frame(
+  sample = rownames(pca_corrected_data$x),
+  X = pca_corrected_data$x[,1],
+  Y = pca_corrected_data$x[,2]
+)
+
+pca_pro_var <- pca_corrected_data$sdev^2
 
 pca_pro_var_per <- round(pca_pro_var / sum(pca_pro_var) * 100, 1)
 
-pdf("Scree_plot_pca_m_pro.pdf")
-barplot(height = pca_pro_var_per, main = "Scree plot", xlab = "Principal Component", ylab = "Percent Variation")
-dev.off()
-
-
-# Confirmar orden entre muestras en PCA y metadata
-all(rownames(pca_pro$x) == metadata_filtered_684$sampleID) # [1] TRUE
-all(pca_m_pro_df$sample == metadata_filtered_684$sampleID) # [1] TRUE
+all(pca_corrected_data_df$sample == metadata_all_filtered_357$sampleID) # [1] TRUE
 
 # Color batch
-pdf("pca_m_pro_batch.pdf")
-pca_m_pro_df %>% 
+pdf("pca_data_corrected_combat_sva_limma.pdf")
+pca_corrected_data_df %>%
   ggplot(mapping = aes(x = X, y = Y)
   ) +
   geom_point() +
-  aes(colour = as.factor(metadata_filtered_684$batch)) +
-  scale_color_discrete(name = "Batch") +
+  aes(colour = as.factor(metadata_all_filtered_357$is_AD)) +
+  scale_color_discrete(name = "AD") +
   xlab(paste("PC1 - ", pca_pro_var_per[1], "%", sep = "")) +
   ylab(paste("PC2 - ", pca_pro_var_per[2], "%", sep = "")) +
   theme_classic() +
   ggtitle("PCA") +
-  stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_filtered_684$batch)), alpha = 0.2, show.legend = FALSE)
-dev.off()
-
-# Color ceradsc
-pdf("pca_m_pro_ceradsc.pdf")
-pca_m_pro_df %>% 
-  ggplot(mapping = aes(x = X, y = Y)
-  ) +
-  geom_point() +
-  aes(colour = as.factor(metadata_filtered_684$ceradsc)) +
-  scale_color_discrete(name = "Cerad Stage") +
-  xlab(paste("PC1 - ", pca_pro_var_per[1], "%", sep = "")) +
-  ylab(paste("PC2 - ", pca_pro_var_per[2], "%", sep = "")) +
-  theme_classic() +
-  ggtitle("PCA") +
-  stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_filtered_684$ceradsc)), alpha = 0.2, show.legend = FALSE)
-dev.off()
-
-# Color sample_plate
-pdf("pca_m_pro_samplePlate.pdf")
-pca_m_pro_df %>% 
-  ggplot(mapping = aes(x = X, y = Y)
-  ) +
-  geom_point() +
-  aes(colour = as.factor(metadata_filtered_684$Sample_Plate)) +
-  scale_color_discrete(name = "Sample Plate") +
-  xlab(paste("PC1 - ", pca_pro_var_per[1], "%", sep = "")) +
-  ylab(paste("PC2 - ", pca_pro_var_per[2], "%", sep = "")) +
-  theme_classic() +
-  ggtitle("PCA") +
-  stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_filtered_684$Sample_Plate)), alpha = 0.2, show.legend = FALSE)
-dev.off()
-
-# Color braaksc
-pdf("pca_m_pro_braaksc.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$braaksc)
-)
-dev.off()
-
-# Color msex
-pdf("pca_m_pro_msex.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$msex)
-)
-dev.off()
-
-# Color study
-pdf("pca_m_pro_study.pdf")
-plot(
-  x = pca_pro$x[, 1],
-  y = pca_pro$x[, 2],
-  col = as.factor(metadata_filtered_684$Study)
-)
+  stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_all_filtered_357$is_AD)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 
+##################################
+# Evaluar si hubo sobrecorrección / Cuantiifcar la estructura global y local de batch
+##################################
+#Cargar paquete
+devtools::install_github('theislab/kBET')
+
+library(kBET)
 
 
+# Datos sin corregir (punto de comparativa):
+
+# Confirmar orden corecto
+all(colnames(m_values_pro_684_AD) == metadata_all_filtered_357$sampleID)
+
+# kBET - k-nearest neighbour batch effect test
+batch.estimate.NO_data_corrected.batch <- kBET(t(m_values_pro_684_AD), metadata_all_filtered_357$batch)
+
+batch.estimate.NO_data_corrected.batch$summary
+#         kBET.expected kBET.observed  kBET.signif
+# mean     0.03046296     0.4891667 1.165734e-16
+# 2.5%     0.00000000     0.3187500 0.000000e+00
+# 50%      0.02777778     0.5000000 0.000000e+00
+# 97.5%    0.05555556     0.6256944 0.000000e+00
+
+##########################################################################
+# Compute a silhouette width and PCA-based measure: (Diferentes Batches)
+
+################
+## SIN CORREGIR
+################
+#batch = batch
+batch.silhouette_no_corrected <- batch_sil(pca_no_corrected_data, metadata_all_filtered_357$batch)
+# batch.silhouette_no_corrected
+# [1] 0.2783481
+
+
+
+###################
+# Datos CORREGIDOS:
+###################
+
+# Confirmar orden corecto
+all(metadata_all_filtered_357$sampleID == colnames(data_corrected)) # [1] TRUE
+
+# kBET - k-nearest neighbour batch effect test
+#data: a matrix (rows: cells or other observations, columns: features (genes); will be transposed if necessary)
+#batch: vector or factor with batch label of each cell/observation; length has to match the size of the corresponding data dimension  
+batch.estimate.data_corrected.batch <- kBET(t(data_corrected), metadata_all_filtered_357$batch)
+
+batch.estimate.data_corrected.batch$summary
+#        kBET.expected kBET.observed  kBET.signif
+# mean    0.010555556    0.05222222 2.778046e-01
+# 2.5%    0.000000000    0.00000000 1.227691e-10
+# 50%     0.009259259    0.05555556 1.710676e-01
+# 97.5%   0.027777778    0.12569444 1.000000e+00
+
+# Compute a silhouette width and PCA-based measure:
+# data: a matrix (rows: samples, columns: features (genes))
+# batch: vector or factor with batch label of each cell 
+batch.silhouette <- batch_sil(pca_corrected_data, metadata_all_filtered_357$batch)
+# batch.silhouette
+# [1] -0.01826994
+
+# CONCLUSIONES:
+# 1. No hay estructura local por batch (kBET)
+# 2. No hay estructura global por batch (silhouette score)
+# 3. Hubo una muy muy ligera sobre-corrección (overfitting), -0.01826994, esperable por confounding
+# 4. Se removió efectivamente el efecto de lote (Confirmado con PCAs por color) :)
+
+
+
+##############################################################
 # Guardar datos preprocesados (posterior integración en SGCCA)
 write.table(
-          x = betas_final,
-       file = gzfile("betas_preprocessed_684_ROSMAP.tsv.gz"),
-        sep = "\t",
-      quote = FALSE,
-  row.names = TRUE,
-  col.names = NA
-)
-
-write.table(
-  x = m_values_pro_684_noBatch,
-  file = gzfile("mvalues_preprocessed_684_ROSMAP.tsv.gz"),
+  data_corrected,
+  file = "Methyl_data_final_m_values.tsv",
   sep = "\t",
   quote = FALSE,
-  row.names = TRUE,
-  col.names = NA
+  row.names = TRUE
 )
 
+# Confirmar lectura de datos
+# data_methyl_test <- read.table(
+#   "Methyl_data_final_m_values.tsv",
+#   header = TRUE,
+#   row.names = 1,
+#   check.names = FALSE
+# )
 
-# test
-betas <- vroom::vroom("mvalues_preprocessed_684_ROSMAP.tsv.gz")
+# Evaluar guardado
+all.equal(data_corrected, as.matrix(data_methyl_test)) # [1] TRUE :)
+ 
 
-vroom_write()
 
