@@ -1,107 +1,93 @@
-##########################################################################
-#                 QC Analysis illumina 450k beadchip
-##########################################################################
-# 13 abril 2026
-# Arturo, BM
+#############################################
+# Methylation data preprocessing: QC Analysis
+#############################################
+
+library(sesame)       # ‘1.30.1’
+library(BiocParallel) # ‘1.46.0’
+library(tidyverse)    # ‘2.0.0’
+library(vroom)        # ‘1.7.1’
+library(sva)          # ‘3.60.0’
+library(limma)        # ‘3.68.4’
+library(kBET)         # ‘0.99.6’
 
 
-# Cargar librerias
-library(sesame)
-library(sesameData)
-library(BiocParallel)
-library(ggplot2)
-library(illuminaio)
-library(tidyverse)
-library(sva)
+# 1. Filtering (sample level)
 
-# Previamente, revisar methyl450k_QA.R
+##  Filter samples with bis_conversion < 0.8:  
+range(bis_conversion$bis_conversion)
+#[1] 1.034091 1.087099 
+# OBS: All samples passes filter
 
+## Filter samples with average detection p-value > 0.05:
+range(avg_pvalue_per_sample_df$pvalue)
+#[1] 0.003251282 0.019761264
+all(avg_pvalue_per_sample_df$pvalue < 0.05)
+#[1] TRUE
+# OBS: All samples passes filter
 
-##########################################
-# FILTRADO DE MUESTRAS
-##########################################
+## Filter samples with success probe detection < 0.95 (95%):
+success_samples <- qc_stats_raw_211 %>% filter(frac_dt >= 0.95) %>% rownames()
 
-## 1. Filtrar muestras solo con mapeo a metadata
+# Filter:
+idats_raw_202 <- idats_raw_211[success_samples]
 
-# SampleID de idats_raw
-sampleID_idat_data <- names(idats_raw)
+length(idats_raw_202)
+#[1] 202
 
-length(sampleID_idat_data) # [1] 739
-
-# SampleID de metadata_all
-sampleID_metadata_all <- metadata_all$sampleID
-
-length(sampleID_metadata_all) # [1] 740
-
-samples_keep <- intersect(x = sampleID_idat_data, y = sampleID_metadata_all) 
-
-# ¿Cuántas muestras quedan?
-length(samples_keep) # [1] 723 // Algunas muestras no mapean a metadata :(
-
-# Filtrar muestras en idats_raw
-idats_raw_723 <- idats_raw[samples_keep]
-
-# Confirmar filtrado
-length(idats_raw_723) # [1] 723
+# OBS: 202 samples passses filter, 9 do not:
+#5815381002_R05C01 0.948672....
+#5822038006_R04C02 0.946480....
+#5822038011_R01C01 0.938333....
+#5822038011_R01C02 0.949893....
+#5822038011_R03C01 0.946242....
+#5822054001_R01C01 0.927540....
+#5822054001_R02C01 0.942683....
+#5822054001_R03C02 0.947369....
+#5822054001_R05C02 0.946707....
+# Bad samples are in the same 4 chips: 5815381002, 5822038006, 5822038011 & 5822054001
 
 
-## 2. Filtrar muestras con conversión a bisulfito < 0.7
-# Todas las muestras pasaron el filtro :)
+# Detect and remove outliers using Mahalanabis distance alghorithm:
+pca_scores <- pca_m_raw_211$x[,1:10]
 
-## 3. Filtrar muestras con Detection p-value > 0.05
-# Todas las muestras pasaron el filtro :)
+md <- mahalanobis(
+  pca_scores,
+  center = colMeans(pca_scores),
+  cov = cov(pca_scores)
+)
 
-## 4. Filtrar muestras con Succes probes Detection < 95%
-qc_statistics_filtered <- qc_statistics[samples_keep, ]
+threshold <- qchisq(
+  0.99,
+  df = ncol(pca_scores)
+)
 
-# Columna frac_dt contiene la proporción de sondas exitosas
-samples_keep <- qc_statistics_filtered %>%
-                  filter(frac_dt >= 0.95) %>%
-                  rownames()
+outlier_samples <- rownames(pca_scores)[md > threshold]
+outlier_samples
+#[1] "5815381015_R06C02" "5822038011_R01C02" "5822071001_R01C02"
+#[4] "5822071001_R02C02" "6042324057_R05C02"
 
-length(samples_keep) # [1] 688
+# Filter outlier samples:
+idats_raw_198 <- idats_raw_202[!names(idats_raw_202) %in% outlier_samples]
 
-# Filtrar muestras
-idats_raw_688 <- idats_raw_723[samples_keep]
-
-# Confirmar filtrado
-length(idats_raw_688) # [1] 688 // Se eliminan 35 muestras
-
-## 5. Filtrado de muestras atípicas (outliers)
-
-# Muestras identificadas con plot promedio_de_betas vs desvest o PCA
-any(names(idats_raw_688) == "5815381015_R06C02") # [1] TRUE
-any(names(idats_raw_688) == "5822038005_R03C02") # [1] FALSE
-any(names(idats_raw_688) == "5815381027_R05C01") # [1] FALSE
-any(names(idats_raw_688) == "5822038006_R05C01") # [1] FALSE
-any(names(idats_raw_688) == "5822071004_R01C02") # [1] TRUE
-any(names(idats_raw_688) == "5822020001_R05C01") # [1] TRUE
-
-no_keep <- c("5815381015_R06C02", "5822071004_R01C02", "5822020001_R05C01") # Solo TRUE
-
-samples_688 <- names(idats_raw_688)
-
-samples_keep <- samples_688[!samples_688 %in% no_keep]
-
-# Filtrar muestras
-idats_raw_685 <- idats_raw_688[samples_keep]
-
-# Confirmar filtrado
-length(idats_raw_685) # [1] 685 // Se eliminan 3 muestras
+# OBS: 198 passes filter
 
 
 ##########################################
 # SESAME PREPROCESSING
 ##########################################
 
-## Detectar/Enmascarar probes "ruidosos" (QualityMask())
-## Inferir color del canal (inferInfiniumIChannel())
-## Corregir sesgos de fluoróforos (Cys3/Cys5) (DybiasNL())
-## Identificar probes fallidos pOOBAH (pOOBAH())
-## Reducción de ruido de fondo/ Background substraction (noob())
+# 21/08/2026
 
-idats_pro_685 <- bplapply(
-                    X = idats_raw_685, 
+# 2. Sesame preprocessing
+
+# Mask potential bad probes
+# Infer color channel
+# Dye bias correction
+# pOOBAH
+# Background substraction
+
+idats_processed_198 <- bplapply(
+                    X = idats_raw_198,
                   FUN = function(sample){
                           noob(
                             pOOBAH(
@@ -114,264 +100,316 @@ idats_pro_685 <- bplapply(
                               )
                             )
                           )
-                        }, 
+                        },
               BPPARAM = MulticoreParam(workers = 40)
 )
 
-# Extraer betas y transformarlo a matrix
-betas_pro_685 <- do.call(
-                  cbind, 
+## Get betas in matrix format:
+betas_processed_198 <- do.call(
+                  cbind,
                   lapply(
-                      X = idats_pro_685, 
+                      X = idats_processed_198,
                     FUN = function(prefix){
-                            sesame::getBetas(prefix)
+                            getBetas(prefix)
                           }
-                   ) 
+                   )
                  )
+# Matrix:
+#   rows: CpG probes
+#columns: samples
+ 
 
 
-##########################################
-# FILTRADO DE SONDAS
-##########################################
+# 3. Filtering (probe level):
 
-## 1. Sondas con valores faltantes (NA, NaN, infinite)
+## Remove any probes that have failed in one or more samples:
+betas_processed_198_filtered <- na.omit(betas_processed_198)
 
-# ¿Existen valores faltantes?
-sum(is.na(betas_pro_685)) # [1] 50619771
-sum(is.nan(betas_pro_685)) # [1] 0
-sum(is.infinite(betas_pro_685)) # [1] 0
+# > dim(betas_processed_198_filtered)
+# [1] 386493    198
 
-# ¿Cual es la proporción de NAs?
-mean(is.na(betas_pro_685)) # [1] 0.1519189 // 15% de los datos
+## Detect probes that fail in at least 1% of samples (considering pvalue > 0.01):
+bad_probes <- rownames(pvalues)[rowMeans(pvalues > 0.01) >= 0.01]
 
-# ¿Cuántas sondas tienen datos completos (no NAs)?
-sum(rowMeans(!is.na(betas_pro_685)) == 1) # [1] 375607 // de 486427
+## Filter bad probes:
+betas_processed_198_filtered_pval <- betas_processed_198_filtered[!rownames(betas_processed_198_filtered) %in% bad_probes, ]
 
-# remove any probes that have failed in one or more samples
-keep <- rowMeans(!is.na(betas_pro_685))
-
-betas_pro_685_filtered <- betas_pro_685[keep == 1, ]
-
-# Confirmar filtrado
-dim(betas_pro_685_filtered) # [1] 375607    685 // se eliminaron 110820 sondas
-sum(is.na(betas_pro_685_filtered)) # [1] 0
-sum(is.nan(betas_pro_685_filtered)) # [1] 0
-sum(is.infinite(betas_pro_685_filtered)) # [1] 0
-
-# Identificar sondas que fallan en al menos 1% de las muestras (consideranddo pval > 0.01)
-bad_probes <- rownames(pvalues)[rowMeans(pvalues > 0.01) > 0.01]
-
-# ¿Cuántos bad probes son?
-length(bad_probes) # [1] 86773 // de 375607
-
-probes_all <- rownames(betas_pro_685_filtered)
-no_keep <- intersect(x = probes_all, y = bad_probes) # [1] 27170
-keep_probes <- !(probes_all %in% bad_probes)
-
-betas_pro_685_filtered_pval <- betas_pro_685_filtered[keep_probes, ]
-
-# Confirmar filtrado
-dim(betas_pro_685_filtered_pval) # [1] 348437    685 // Se eliminan 27170 probes
+# > dim(betas_processed_198_filtered_pval)
+# [1] 356321    198
 
 
-## 2. Sondas con mapeo a cromosomas sexuales
+## Filter probes with sex cromosome mapping:
 
-# Utilizaremos el archivo metadata que contiene solo sondas con mapeo a cromosomas
-# somáticos
+# Read array methylation metadata:
+array_meth_metadata <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/methyl_data/metadata/ROSMAP_arrayMethylation_metaData.tsv")
 
-somatic_probes <- metadata %>%
-  select(TargetID) %>% 
-  unlist() %>%
-  as.vector()
+# Get somatic probes:
+somatic_probes <- array_meth_metadata %>% pull(TargetID)
 
-probes_betas_pro <- rownames(betas_pro_685_filtered_pval)
+# Filter:
+betas_processed_198_filtered_pval_nosex <- betas_processed_198_filtered_pval[rownames(betas_processed_198_filtered_pval) %in% somatic_probes, ]
 
-keep_probes <- intersect(x = somatic_probes, y = probes_betas_pro)
+# > dim(betas_processed_198_filtered_pval_nosex)
+# [1] 341995    198
 
-# Filtrar sondas con mapeo a cromosomas sexuales
-betas_pro_685_filtered_pval_nosex <- betas_pro_685_filtered_pval[keep_probes, ]
+## Filter cross-reactive probes:
 
-# Confirmar filtrado
-dim(betas_pro_685_filtered_pval_nosex) # [1] 335819    685 // Se eliminan 12618
+# Get cross reactive probes:
 
-
-## 3. Sondas con SNPs en el sitio CpG, cross-reactive:
-
+# From:
 # Zhou et al, 2016
 # https://pubmed.ncbi.nlm.nih.gov/27924034/
 # DOI: 10.1093/nar/gkw967
 
 url <- "https://github.com/zhou-lab/InfiniumAnnotationV1/raw/main/Anno/HM450/archive/202209/HM450.hg19.manifest.tsv.gz"
 file <- "HM450.hg19.manifest.tsv"
-
 download.file(url = url, destfile = file)
-
 HM450.hg19.manifest.tsv <- vroom(file = "HM450.hg19.manifest.tsv")
 
-View(HM450.hg19.manifest.tsv)
+# Filter cross-reactive probes:
+betas_processed_198_filtered_pval_nosex_noCrossReactive <- betas_processed_198_filtered_pval_nosex[!rownames(betas_processed_198_filtered_pval_nosex) %in% bad_probes, ]
 
-bad_probes <- HM450.hg19.manifest.tsv %>%
-  filter(MASK_general == TRUE) %>%
-  select(probeID) %>%
-  unlist() %>%
-  as.vector()
-
-# ¿Cuántas bad_probes son?
-length(bad_probes) # [1] 60466
-
-probes_betas_pro <- rownames(betas_pro_685_filtered_pval_nosex)
-
-keep_probes <- !(probes_betas_pro %in% bad_probes)
-
-betas_pro_685_filtered_pval_nosex_noSNP_noCrossreactive <- betas_pro_685_filtered_pval_nosex[keep_probes, ]
-
-# Confirmar filtrado
-dim(betas_pro_685_filtered_pval_nosex_noSNP_noCrossreactive) # [1] 335299    685 // se eliminaron 520 sondas
+# > dim(betas_processed_198_filtered_pval_nosex_noCrossReactive)
+# [1] 341452    198
 
 
+# 4. Remove batch effect:
 
-##########################################
-# REMOVER EFECTO DE LOTE
-##########################################
-
-# Convertir beta values a m values
-m_values_pro<- BetaValueToMValue(
-  b = betas_pro_685_filtered_pval_nosex_noSNP_noCrossreactive
+## Get beta values to m values:
+m_values_processed_198 <- BetaValueToMValue(
+  b = betas_processed_198_filtered_pval_nosex_noCrossReactive
 )
 
-# Eliminar muestra 5822038012_R02C01, contiene NA en metadata
-no_keep <- "5822038012_R02C01"
 
-m_values_pro_684 <- m_values_pro[ ,!(colnames(m_values_pro) %in% no_keep)]
+# Filter metadata (to 198 subjects):
+metadata_filtered_isAD_methyl_processed_198 <- metadata_filtered_isAD_methyl_211 %>% filter(sampleID %in% colnames(m_values_processed_198))
 
+# Check that all samples in m_values object matches order in metadata (needed for batch effect removing):
+all(metadata_filtered_isAD_methyl_processed_198$sampleID == colnames(m_values_processed_198))
+#[1] TRUE
 
-# # También es necesario filtrar metadata
-# samples_684 <- colnames(m_values_pro_684)
-# 
-# metadata_filtered_684 <- Metadata_filtered_723 %>%
-#                             filter(sampleID %in% samples_684)
-# 
-# # Confirmar orden entre muestras y metadata
-# all(samples_684 == metadata_filtered_684$sampleID) # [1] TRUE :)
+# Remove known batch effect:
 
+## set batch:
+# That's why we need same order in metadata and  samples m_values object
+batch <- metadata_filtered_isAD_methyl_processed_198$batch
 
-# Filtrar metadata con diagnóstico Alzheimer (is_AD)
-metadata_all_isAD  <- metadata_all %>%
-  mutate(is_AD = case_when(
-    cogdx == 1 & ceradsc %in% c(3, 4) ~ "control",
-    cogdx %in% c(4, 5) & braaksc >= 3 & ceradsc %in% c(1, 2) ~ "AD-NC_SYM",
-    TRUE ~ NA_character_
-  )) %>% 
-  filter(!is.na(is_AD))
+## Set protecting model (this is biology, do not touch it):
+model <- model.matrix(~as.factor(is_AD), metadata_filtered_isAD_methyl_processed_198)
 
-# Filtrar valores m con metadata is_AD
-sampleIDs <- metadata_all_isAD %>% 
-              select(sampleID) %>% 
-              unlist() %>% 
-              as.vector()
-
-m_values_pro_684_AD <- m_values_pro_684[, colnames(m_values_pro_684) %in% sampleIDs]
-
-dim(m_values_pro_684_AD)
-# [1] 335299    357
-
-# Volver a filtrar metadata
-sampleIDs <- colnames(m_values_pro_684_AD)
-
-metadata_all_filtered_357 <- metadata_all_isAD %>% 
-                              filter(sampleID %in% sampleIDs)
-
-dim(metadata_all_filtered_357)
-# [1] 357  50
-
-# Confirmar orden entre metadata y objeto de valores m
-all(colnames(m_values_pro_684_AD) == metadata_all_filtered_357$sampleID) #[1] FALSE
-
-# Ordenar metadata en base a objeto valores m
-metadata_all_filtered_357 <- metadata_all_filtered_357[match(x = colnames(m_values_pro_684_AD), table = metadata_all_filtered_357$sampleID), ]
-
-# Confirmar orden entre metadata y objeto de valores m
-all(colnames(m_values_pro_684_AD) == metadata_all_filtered_357$sampleID) # [1] TRUE
-
-dim(metadata_all_filtered_357)
-# [1] 357  50
+## Remove known batch effect: batch
+m_values_processed_198_noBatch <- ComBat(
+                              dat = m_values_processed_198,
+                            batch = batch,
+                              mod = model
+                            )
+#Found2batches
+#Adjusting for1covariate(s) or covariate level(s)
+#Standardizing Data across genes
+#Fitting L/S model and finding priors
+#Finding parametric adjustments
+#Adjusting the Data
 
 
+## Remove unknown batch effect:
 
-# PCA SIN CORREGIR EFECTOS DE LOTE
+# set models:
+model <- model.matrix(~as.factor(is_AD), metadata_filtered_isAD_methyl_processed_198)
+model0 <- model.matrix(~1, data = metadata_filtered_isAD_methyl_processed_198)
 
-pca_no_corrected_data <- prcomp(
-                          x = t(m_values_pro_684_AD),
-                     scale. = TRUE
-                     )
-
-# Transformar datos para ggplot
-pca_no_corrected_data_df <- data.frame(
-  sample = rownames(pca_no_corrected_data$x),
-  X = pca_no_corrected_data$x[,1],
-  Y = pca_no_corrected_data$x[,2]
+# estimate hidden variation with sva:
+svobj <- sva(
+  dat = m_values_processed_198_noBatch,
+  mod =  model,
+ mod0 = model0
 )
 
-pca_pro_var <- pca_no_corrected_data$sdev^2
+# Remove unknown batch effect (limma):
+m_values_processed_198_noBatch_unknownSVA<- removeBatchEffect(
+    x = m_values_processed_198_noBatch,
+  covariates = svobj$sv, design = model
+)
 
-pca_pro_var_per <- round(pca_pro_var / sum(pca_pro_var) * 100, 1)
 
-all(pca_no_corrected_data_df$sample == metadata_all_filtered_357$sampleID) # [1] TRUE
 
-# Color batch
-pdf("pca_no_corrected_data.pdf")
-pca_no_corrected_data_df %>%
-  ggplot(mapping = aes(x = X, y = Y)
-  ) +
-  geom_point() +
-  aes(colour = as.factor(metadata_all_filtered_357$Sentrix_ID)) +
-  scale_color_discrete(guide = "none") +
-  xlab(paste("PC1 - ", pca_pro_var_per[1], "%", sep = "")) +
-  ylab(paste("PC2 - ", pca_pro_var_per[2], "%", sep = "")) +
-  theme_classic() +
-  ggtitle("PCA (No corregido)") +
-  stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_all_filtered_357$Sentrix_ID)), alpha = 0.2, show.legend = FALSE)
+##################
+PCA Combat_noBatch
+##################
+
+# PCA:
+pca_m_processed_198_noBatch <- prcomp(
+  x = t(m_values_processed_198_noBatch),
+  scale. = TRUE)
+
+# Change format to data frame (for plotting):
+
+pca_m_processed_198_noBatch_df <- data.frame(
+  sample = rownames(pca_m_processed_198_noBatch$x),
+  X = pca_m_processed_198_noBatch$x[,1],
+  Y = pca_m_processed_198_noBatch$x[,2]
+)
+
+pca_var_processed_198 <- pca_m_processed_198_noBatch$sdev^2
+pca_var_processed_198_per <- round(pca_var_processed_198 / sum(pca_var_processed_198) * 100, 1)
+
+# Check order for colouring:
+all(metadata_filtered_isAD_methyl_processed_198$sampleID == pca_m_processed_198_noBatch_df$sample)
+#[1] TRUE
+
+
+# Plot(colour = batch):
+
+pdf("pca_m_processed_noBatch_198_colbatch.pdf")
+  pca_m_processed_198_noBatch_df %>%
+ ggplot(mapping = aes(x = X, y = Y)
+      ) +
+      geom_point() +
+      aes(colour = as.factor(metadata_filtered_isAD_methyl_processed_198$batch)) +
+      scale_color_discrete(name = "Batch") +
+      xlab(paste("PC1 - ", pca_var_processed_198_per[1], "%", sep = "")) +
+      ylab(paste("PC2 - ", pca_var_processed_198_per[2], "%", sep = "")) +
+      theme_classic() +
+      ggtitle("PCA") +
+      stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_filtered_isAD_methyl_processed_198$batch)), alpha = 0.2, show.legend = FALSE)
+dev.off()
+
+# plot PCA (colour = isAD)
+# plot PCA (colour = Sample_Plate)
+# plot PCA (colour = Study-ROS_MAP)
+# plot PCA (colour = Sentrix_ID)
+##################################################################
+
+
+
+#############################
+PCA Combat_noBatch_unknownSVA
+#############################
+
+# PCA:
+pca_m_processed_198_noBatch_unknwonSVA <- prcomp(
+  x = t(m_values_processed_198_noBatch_unknownSVA),
+  scale. = TRUE)
+
+# Change format to data frame (for plotting):
+pca_m_processed_198_noBatch_unknwonSVA_df <- data.frame(
+  sample = rownames(pca_m_processed_198_noBatch_unknwonSVA$x),
+  X = pca_m_processed_198_noBatch_unknwonSVA$x[,1],
+  Y = pca_m_processed_198_noBatch_unknwonSVA$x[,2]
+)
+
+
+pca_var_processed_198_noBatch_unknownSVA <- pca_m_processed_198_noBatch_unknwonSVA$sdev^2
+pca_var_processed_198_noBatch_unknownSVA_per <- round(pca_var_processed_198_noBatch_unknownSVA / sum(pca_var_processed_198_noBatch_unknownSVA) * 100, 1)
+
+all(metadata_filtered_isAD_methyl_processed_198$sampleID == pca_m_processed_198_noBatch_unknwonSVA_df$sample)
+#[1] TRUE
+
+# Plot PCA (color = batch):
+
+pdf("pca_m_processed_noBatch_unkwnonSVA_198_colbatch.pdf")
+  pca_m_processed_198_noBatch_unknwonSVA_df %>%
+ ggplot(mapping = aes(x = X, y = Y)
+      ) +
+      geom_point() +
+      aes(colour = as.factor(metadata_filtered_isAD_methyl_processed_198$batch)) +
+      scale_color_discrete(name = "Batch") +
+      xlab(paste("PC1 - ", pca_var_processed_198_noBatch_unknownSVA_per[1], "%", sep = "")) +
+      ylab(paste("PC2 - ", pca_var_processed_198_noBatch_unknownSVA_per[2], "%", sep = "")) +
+      theme_classic() +
+      ggtitle("PCA") +
+      stat_ellipse(geom = "polygon", aes(fill = as.factor(metadata_filtered_isAD_methyl_processed_198$batch)), alpha = 0.2, show.legend = FALSE)
 dev.off()
 
 
-#########################
-# CORREGIR EFECTO DE LOTE
-#########################
-all(metadata_all_filtered_357$sampleID == colnames(m_values_pro_684_AD)) # [1] TRUE
-
-# Corregir efecto de lote conocido
-batch <- metadata_all_filtered_357$batch
-
-# Definir modelo de protector
-mod <- model.matrix(~as.factor(is_AD), metadata_all_filtered_357)
-
-# Corregir efecto de lote conocido: batch
-m_values_pro_357_noBatch <- ComBat(
-                              dat = m_values_pro_684_AD,
-                            batch = batch, 
-                              mod = mod
-                            )
-
-# Corregir efecto de lote: Desconocido (sva)
-# Ajustar modelos
-mod <- model.matrix(~as.factor(is_AD), data = metadata_all_filtered_357)
-
-mod0 <- model.matrix(~1, data = metadata_all_filtered_357)
-
-# SVA para estimar variación oculta
-svobj <- sva(
-  dat = m_values_pro_357_noBatch,
-  mod =  mod, 
- mod0 = mod0
-) # long time ~ 1.75 hrs
-
-# Remover variación oculta con limma
-data_corrected <- removeBatchEffect(
-    x = m_values_pro_357_noBatch,
-  covariates = svobj$sv
-)
+# plot PCA (colour = isAD)
+# plot PCA (colour = Sample_Plate)
+# plot PCA (colour = Study-ROS_MAP)
+# plot PCA (colour = Sentrix_ID)
 
 
-###############
-# FIN :)
-###############
+# 24/08/2026
+
+# Quantify global structure with silhouette score:
+
+## RAW DATA
+
+## Check order is correct:
+all(colnames(pca_m_raw_211) == metadata_filtered_isAD_methyl_211$sampleID)
+#[1] TRUE
+
+# batch:
+silhouette_score_batch_m_raw_211 <- batch_sil(pca_m_raw_211, metadata_filtered_isAD_methyl_211$batch)
+silhouette_score_batch_m_raw_211
+#[1] 0.1677163
+
+# AD/Control:
+silhouette_score_is_AD_m_raw_211 <- batch_sil(pca_m_raw_211, as.factor(metadata_filtered_isAD_methyl_211$is_AD))
+silhouette_score_is_AD_m_raw_211
+#[1] -0.004783993
+
+# Sample plate:
+silhouette_score_samplePlate_m_raw_211 <- batch_sil(pca_m_raw_211, as.factor(metadata_filtered_isAD_methyl_211$Sample_Plate))
+silhouette_score_samplePlate_m_raw_211
+#[1] -0.1323941
+
+# SentrixID:
+silhouette_score_sentrixID_m_raw_211 <- batch_sil(pca_m_raw_211, as.factor(metadata_filtered_isAD_methyl_211$Sentrix_ID))
+silhouette_score_sentrixID_m_raw_211
+#[1] -0.2310685
+
+
+## KNOWN BATCH
+
+# Check order is correct:
+all(metadata_filtered_isAD_methyl_processed_198$sampleID == colnames(pca_m_processed_198_noBatch))
+#[1] TRUE
+
+# Batch:
+silhouette_score_batch_m_processed_198_noBatch <- batch_sil(pca_m_processed_198_noBatch, metadata_filtered_isAD_methyl_processed_198$batch)
+silhouette_score_batch_m_processed_198_noBatch
+#[1] 0.03846471
+
+# AD/Control:
+silhouette_score_is_AD_m_processed_198_noBatch <- batch_sil(pca_m_processed_198_noBatch, as.factor(metadata_filtered_isAD_methyl_processed_198$is_AD))
+silhouette_score_is_AD_m_processed_198_noBatch
+#[1] -0.001152145
+
+# Sample plate:
+silhouette_score_samplePlate_m_processed_198_noBatch <- batch_sil(pca_m_processed_198_noBatch, as.factor(metadata_filtered_isAD_methyl_processed_198$Sample_Plate))
+silhouette_score_samplePlate_m_processed_198_noBatch
+#[1] -0.1638075
+
+# SentrixID
+silhouette_score_sentrixID_m_processed_198_noBatch <- batch_sil(pca_m_processed_198_noBatch, as.factor(metadata_filtered_isAD_methyl_processed_198$Sentrix_ID))
+silhouette_score_sentrixID_m_processed_198_noBatch
+#[1] -0.4089403
+
+
+## KNOWN BATCH + UNKOWN SVA(LIMMA):
+
+# Check order is correct:
+all(metadata_filtered_isAD_methyl_processed_198$sampleID == colnames(pca_m_processed_198_noBatch_unknwonSVA))
+#[1] TRUE
+
+# batch:
+silhouette_score_batch_m_processed_198_noBatch_unkownSVA <- batch_sil(pca_m_processed_198_noBatch_unknwonSVA, metadata_filtered_isAD_methyl_processed_198$batch)
+silhouette_score_batch_m_processed_198_noBatch_unkownSVA
+#[1] 0.002686696
+
+# AD/Control:
+silhouette_score_is_AD_m_processed_198_noBatch_unkownSVA <- batch_sil(pca_m_processed_198_noBatch_unknwonSVA, as.factor(metadata_filtered_isAD_methyl_processed_198$is_AD))
+silhouette_score_is_AD_m_processed_198_noBatch_unkownSVA
+#[1] 0.2126924
+
+# Sample Plate:
+silhouette_score_samplePlate_m_processed_198_noBatch_unkownSVA <- batch_sil(pca_m_processed_198_noBatch_unknwonSVA, as.factor(metadata_filtered_isAD_methyl_processed_198$Sample_Plate))
+silhouette_score_samplePlate_m_processed_198_noBatch_unkownSVA
+#[1] -0.09693983
+
+# SentrixID:
+silhouette_score_sentrixID_m_processed_198_noBatch_unkownSVA <- batch_sil(pca_m_processed_198_noBatch_unknwonSVA, as.factor(metadata_filtered_isAD_methyl_processed_198$Sentrix_ID))
+silhouette_score_sentrixID_m_processed_198_noBatch_unkownSVA
+#[1] -0.4271414
+
+
+
