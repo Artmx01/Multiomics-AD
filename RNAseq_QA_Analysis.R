@@ -220,7 +220,24 @@ pdf("counts_raw_215_rna_comp_bias.pdf")
 explo.plot(rna_comp_bias, samples = 1:12)
 dev.off()
 
-# 5. meanVar plot
+# 5. meanVar plot:
+
+# Average gene expresión
+avg_gene_exps_raw_215 <- rowMeans(rnaseq_counts_raw_215)
+
+# Variance per gene
+gene_vars_raw_215 <- apply(rnaseq_counts_raw_215, 1, var)
+
+# Plot mean variance relation (log-log scale)
+pdf("meanVar_raw_215.pdf")
+plot(
+    x    = avg_gene_exps_raw_215, 
+    y    = gene_vars_raw_215, 
+    log  = "xy", 
+    main = "Mean-Variance relation", 
+    xlab = "Mean expression (log scale)", 
+    ylab = "Variance (log scale)")
+dev.off()
 
 
 # 6. PCA:
