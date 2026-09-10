@@ -8,15 +8,15 @@ library(tidyverse) # ‘2.0.0’
 library(NOISeq)    # ‘2.56.0’
 library(biomaRt)   # ‘2.68.0’
 library(EDASeq)    # ‘2.46.0’
-library(DESeq2)    # ‘1.52.0’
+
 
 # QC RNAseq workflow:
 # 1. Filter low counts (CPM > 1)
 # 2. Adjust GC bias with EDASeq
 # 3. Normalize with TMM method
 # 4. Filter genes: only protein-coding, miRNAs, lncRNAs
-# 5. Stabilize mean-variance relation with DESeq2 (important for SGCCA)
-# 5. Remove batch effect
+# 5. Stabilize mean-variance relation (important for SGCCA)
+# 6. Remove batch effect
 
 
 
@@ -142,17 +142,9 @@ rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures <- rnaseq_counts_fi
 # [1] 15045   215
 
 
-# 5. Stabilize mean-variance relation with DESeq2 (important for sgcca):
+# 5. Stabilize mean-variance relation (important for SGCCA):
 
-# Integer data is needed
-mode(rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures) <- "integer" 
-
-# Transform Data
-rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures_meanVarStable <- varianceStabilizingTransformation(
-     object = rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures, 
-      blind = FALSE, # many of genes have large differences in counts due to the experimental design. So 'blind = FALSE' is recommended
-    fitType = "mean" #  a VST is applied for Negative Binomial distributed counts
-) 
+rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures <- log2(rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures + 1)
 
 
 # 6. Remove batch effect:
@@ -160,7 +152,8 @@ rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures_meanVarStable <- va
 # Create NOISeq object with filtered selected features
 
 # Filter myannot: Onlye features of interest
-myannot_selectedFeatures <- myannot_CPM %>% filter(gene_biotype %in% c("protein_coding", "miRNA", "lncRNA"))
+myannot_selectedFeatures <- myannot_CPM %>% 
+        filter(gene_biotype %in% c("protein_coding", "miRNA", "lncRNA"))
 
 # dim(myannot_selectedFeatures)
 # [1] 15045     8
@@ -175,8 +168,8 @@ mygc <- setNames(myannot_selectedFeatures$percentage_gene_gc_content, myannot_se
 
 # Create NOISeq object
 
-noiseqData_filtered_CPM_noGCbias_TMM_selectedFeatures_meanVarStable <- NOISeq::readData(
-          data    = rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures_meanVarStable,
+ noiseqData_filtered_CPM_noGCbias_TMM_selectedFeatures_meanVarStable <- NOISeq::readData(
+          data    = rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures,
           factors = factors,
           length  = mylength,
           biotype = mybiotype,
@@ -184,11 +177,10 @@ noiseqData_filtered_CPM_noGCbias_TMM_selectedFeatures_meanVarStable <- NOISeq::r
 )
 
 # Remove known batch
-noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_meanVarStable_noBatch <- ARSyNseq(
-    data      = noiseqData_filtered_CPM_noGCbias_TMM_selectedFeatures_meanVarStable, 
-    factor    = "sequencingBatch", 
-    batch     = TRUE,
-    norm      = "n",
-    logtransf = FALSE
-)
+noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch <- ARSyNseq(
+        data      = noiseqData_filtered_CPM_noGCbias_TMM_selectedFeatures_meanVarStable,
+        factor    = "sequencingBatch", 
+        batch     = TRUE, 
+        norm      = "n", 
+        logtransf = FALSE)
                 
