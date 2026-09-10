@@ -12,38 +12,39 @@ library(EDASeq)    # ‘2.46.0’
 
 # QA analysis workflow:
 # 1. Check low counts
-# 2. GC bias
-# 3. Length bias
-# 4. RNA compostion bias
-# 5. PCA
+# 2. Check GC bias
+# 3. Check Length bias
+# 4. Check RNA compostion bias
+# 5. Check meanVar bias
+# 6. PCA
+# Save filtered data
 
 
+# 1. Check low counts:
 
-# 1.  Check low counts:
-
-mycountsbio_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures,
+mycountsbio_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch,
                    type =  "countsbio",
                    norm = TRUE,
                    factor = NULL)
 
 # Boxplot
-pdf("Counts_filtered_215.pdf")
+pdf("counts_filtered_215.pdf")
 explo.plot(mycountsbio_filtered,
-           plottype = "boxplot",
+           plottype = "boxplot", #type of plot
            samples = 1:50)
 dev.off()
 
 # Barplot (Sensitivity Plot)
-pdf("Counts_filtered_215_barplot.pdf")
+pdf("counts_filtered_215_barplot.pdf")
 explo.plot(mycountsbio_filtered,
-           plottype = "barplot",
+           plottype = "barplot", #type of plot
            samples = 1:50)
 dev.off()
 
 
-# 2. GC bias:
+# 2. Check GC bias:
 
-myGCcontent_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures,
+ myGCcontent_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch,
                    k = 0,            # A feature is considered to be detected if the corresponding number of read counts is > k.
                    type = "GCbias",
                    factor = NULL)
@@ -56,7 +57,7 @@ dev.off()
 
 # GC bias by factor = is_AD
 
-myGCcontent_AD_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures,
+myGCcontent_AD_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch,
                    k = 0,
                    type = "GCbias",
                    factor = "is_AD")
@@ -68,14 +69,14 @@ explo.plot(myGCcontent_AD_filtered,
 dev.off()
 
 
-# 3. Length bias:
+# 3. Check Length bias:
 
-mylengthbias_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures,
+ mylengthbias_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch,
                     k = 0,
                     type = "lengthbias",
                     factor = NULL)
 
-pdf("count_filtered_215_lengthBias.pdf")
+pdf("counts_filtered_215_lengthBias.pdf")
 explo.plot(mylengthbias_filtered,
            samples = 1:12,
            toplot = "global")
@@ -83,34 +84,44 @@ dev.off()
 
 # length bias by factor = is_AD
 
-mylengthbias_AD_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures,
+mylengthbias_AD_filtered <- dat(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch,
                     k = 0,
                     type = "lengthbias",
                     factor = "is_AD")
 
-pdf("count_filtered_215_lengthBias_AD.pdf")
+pdf("counts_filtered_215_lengthBias_AD.pdf")
 explo.plot(mylengthbias_AD_filtered,
            samples = NULL,
            toplot = "global")
 dev.off()
 
 
-# 4. RNA compostion bias
+# 4. Check RNA compostion bias:
 
-rna_comp_bias_filtered <- dat(input = noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures, type = "cd", norm = TRUE)
+rna_comp_bias_filtered <- dat(input = noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch, type = "cd", norm = TRUE)
 
 pdf("counts_filtered_215_rna_comp_bias.pdf")
 explo.plot(rna_comp_bias_filtered, samples = 1:12)
 dev.off()
 
 
-# 5. PCA
+# 5. Check meanVar bias:
 
-pca_rnaseq_filtered_215 <- prcomp(
-    x      = t(exprs(noiseqData_filtered_215_CPM_noGCbias_TMM_nobatch_selectedFeatures)), 
-    center = TRUE, 
-    scale. = FALSE
-)
+# Average gene expression
+avg_gene_exps_filtered_215 <- rowMeans(exprs(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch))
+
+# Variance per gene
+gene_vars_filtered_215 <- apply(exprs(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch), 1, var)
+
+# Plot mean-variance relation (log-log scale)
+pdf("meanVar_filtered_215.pdf")
+plot(x = avg_gene_exps_filtered_215, y = gene_vars_filtered_215, log = "xy", main = "Mean-Variance relation", xlab = "Mean expression (log scale)", ylab = "Variance (log scale)")
+dev.off()
+
+
+# 6. PCA:
+
+pca_rnaseq_filtered_215 <- prcomp(x = t(exprs(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch)), center = TRUE, scale. = FALSE)
 
 pca_rnaseq_filtered_215_df <- data.frame(
   sample = rownames(pca_rnaseq_filtered_215$x),
@@ -125,7 +136,6 @@ pca_var_rnaseq_filtered_215_per <- round(pca_var_rnaseq_filtered_215 / sum(pca_v
 identical(pca_rnaseq_filtered_215_df$sample, RNA_seq_metadata_filteredQC_DLPFC_215$specimenID)
 # [1] TRUE
 
-# Plot PCA
 pdf("pca_rnaseq_filtered_215_isAD.pdf")
   pca_rnaseq_filtered_215_df %>%
  ggplot(mapping = aes(x = X, y = Y)
@@ -141,3 +151,28 @@ pdf("pca_rnaseq_filtered_215_isAD.pdf")
 dev.off()
 
 # PCA (Colour = sequencingBatch)
+pdf("pca_rnaseq_filtered_215_batch.pdf")
+  pca_rnaseq_filtered_215_df %>%
+ ggplot(mapping = aes(x = X, y = Y)
+      ) +
+      geom_point() +
+      aes(colour = as.factor(RNA_seq_metadata_filteredQC_DLPFC_215$sequencingBatch)) +
+      scale_color_discrete(name = "Batch") +
+      xlab(paste("PC1 - ", pca_var_rnaseq_filtered_215_per[1], "%", sep = "")) +
+      ylab(paste("PC2 - ", pca_var_rnaseq_filtered_215_per[2], "%", sep = "")) +
+      theme_classic() +
+      ggtitle("PCA") +
+      stat_ellipse(geom = "polygon", aes(fill = as.factor(RNA_seq_metadata_filteredQC_DLPFC_215$sequencingBatch)), alpha = 0.2, show.legend = FALSE)
+dev.off()
+
+######################################
+######################################
+
+# Save filtered data
+saveRDS(object = exprs(noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch), file = "ROSMAP_RNAseq_counts_filtered_215.rds")
+
+# Save metadata filtered
+vroom_write(RNA_seq_metadata_filteredQC_DLPFC_215 , file = "ROSMAP_RNAseq_metadata_filtered_215.txt")
+
+# Save annotation features (of genes)
+vroom_write(myannot_selectedFeatures, file = "ROSMAP_RNAseq_annotationFeatures_filtered_215.txt")
