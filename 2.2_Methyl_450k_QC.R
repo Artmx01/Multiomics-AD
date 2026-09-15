@@ -11,24 +11,55 @@ library(limma)        # ‘3.68.4’
 library(kBET)         # ‘0.99.6’
 
 
-# 1. Filtering (sample level)
+#           -- Workflow --
+#
+# 1.--- Filtering (Sample level) -----
+# 1.1 bis_conv < 0.8
+# 1.2 Average detection p-value > 0.05
+# 1.3 Success probe detection < 0.95 (95%)
+# 1.4 Detect & Remove outliers
+# 
+# 2.--- Sesame Preprocessing ------
+# 2.1 Sesame preprocessing
+# 2.2 Get betas in matrix format
+#
+# 3.--- Filtering (Probe level) -----
+# 3.1 Probes that have failed in one or more samples
+# 3.2 Probes that fail in at least 1% of samples (considering pvalue > 0.01)
+# 3.3 Probes with sex cromosome mapping
+# 3.4 Cross-reactive probes
+#
+# 4.--- Remove Batch effect -----
+# 4.1 Get beta values to m values
+# 4.2 Remove known batch effect
+# 4.3 Remove unknown batch effect
 
-##  Filter samples with bis_conversion < 0.8:  
+
+
+
+# 1. ----------------------- Filtering (sample level) -------------------------
+
+# 1.1 Filter samples with bis_conversion < 0.8
+
 range(bis_conversion$bis_conversion)
 #[1] 1.034091 1.087099 
 # OBS: All samples passes filter
 
-## Filter samples with average detection p-value > 0.05:
+
+# 1.2 Filter samples with average detection p-value > 0.05
+
 range(avg_pvalue_per_sample_df$pvalue)
 #[1] 0.003251282 0.019761264
 all(avg_pvalue_per_sample_df$pvalue < 0.05)
 #[1] TRUE
 # OBS: All samples passes filter
 
-## Filter samples with success probe detection < 0.95 (95%):
+
+# 1.3 Filter samples with success probe detection < 0.95 (95%)
+
 success_samples <- qc_stats_raw_211 %>% filter(frac_dt >= 0.95) %>% rownames()
 
-# Filter:
+# Filter
 idats_raw_202 <- idats_raw_211[success_samples]
 
 length(idats_raw_202)
@@ -47,7 +78,7 @@ length(idats_raw_202)
 # Bad samples are in the same 4 chips: 5815381002, 5822038006, 5822038011 & 5822054001
 
 
-# Detect and remove outliers using Mahalanabis distance alghorithm:
+# 1.4 Detect and remove outliers using Mahalanabis distance alghorithm
 pca_scores <- pca_m_raw_211$x[,1:10]
 
 md <- mahalanobis(
@@ -69,22 +100,22 @@ outlier_samples
 # Filter outlier samples:
 idats_raw_198 <- idats_raw_202[!names(idats_raw_202) %in% outlier_samples]
 
+# length(idats_raw_198)
+# [1] 198
 # OBS: 198 passes filter
 
 
-##########################################
-# SESAME PREPROCESSING
-##########################################
 
-# 21/08/2026
+# 2. ------------------------ Sesame Preprocessing -------------------------
 
-# 2. Sesame preprocessing
 
-# Mask potential bad probes
-# Infer color channel
-# Dye bias correction
-# pOOBAH
-# Background substraction
+# 2.1 Sesame preprocessing
+# Description: 
+# Mask potential bad probes ---> (qualityMask)
+# Infer color channel       ---> (inferInfiniumIChannel)
+# Dye bias correction       ---> (dyeBiasNL)
+# pOOBAH                    ---> (Background substraction)
+# Normalization             ---> (noob)
 
 idats_processed_198 <- bplapply(
                     X = idats_raw_198,
@@ -104,7 +135,7 @@ idats_processed_198 <- bplapply(
               BPPARAM = MulticoreParam(workers = 40)
 )
 
-## Get betas in matrix format:
+# 2.2 Get betas in matrix format
 betas_processed_198 <- do.call(
                   cbind,
                   lapply(
@@ -120,42 +151,45 @@ betas_processed_198 <- do.call(
  
 
 
-# 3. Filtering (probe level):
+# 3. ------------------------- Filtering (probe level) -------------------------
 
-## Remove any probes that have failed in one or more samples:
+
+# 3.1 Remove any probes that have failed in one or more samples
+
 betas_processed_198_filtered <- na.omit(betas_processed_198)
 
-# > dim(betas_processed_198_filtered)
+dim(betas_processed_198_filtered)
 # [1] 386493    198
 
-## Detect probes that fail in at least 1% of samples (considering pvalue > 0.01):
+
+# 3.2 Remove probes that fail in at least 1% of samples (considering pvalue > 0.01):
 bad_probes <- rownames(pvalues)[rowMeans(pvalues > 0.01) >= 0.01]
 
 ## Filter bad probes:
 betas_processed_198_filtered_pval <- betas_processed_198_filtered[!rownames(betas_processed_198_filtered) %in% bad_probes, ]
 
-# > dim(betas_processed_198_filtered_pval)
+dim(betas_processed_198_filtered_pval)
 # [1] 356321    198
 
 
-## Filter probes with sex cromosome mapping:
+# 3.3 Filter probes with sex cromosome mapping:
 
-# Read array methylation metadata:
+# Read array methylation metadata
 array_meth_metadata <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/methyl_data/metadata/ROSMAP_arrayMethylation_metaData.tsv")
 
-# Get somatic probes:
+# Get somatic probes
 somatic_probes <- array_meth_metadata %>% pull(TargetID)
 
-# Filter:
+# Filter
 betas_processed_198_filtered_pval_nosex <- betas_processed_198_filtered_pval[rownames(betas_processed_198_filtered_pval) %in% somatic_probes, ]
 
-# > dim(betas_processed_198_filtered_pval_nosex)
+dim(betas_processed_198_filtered_pval_nosex)
 # [1] 341995    198
 
-## Filter cross-reactive probes:
 
-# Get cross reactive probes:
+# 3.4 Filter cross-reactive probes:
 
+# Get cross reactive probes
 # From:
 # Zhou et al, 2016
 # https://pubmed.ncbi.nlm.nih.gov/27924034/
@@ -166,16 +200,19 @@ file <- "HM450.hg19.manifest.tsv"
 download.file(url = url, destfile = file)
 HM450.hg19.manifest.tsv <- vroom(file = "HM450.hg19.manifest.tsv")
 
-# Filter cross-reactive probes:
+# Get cross-reactive probes
+bad_probes <- HM450.hg19.manifest.tsv %>% filter(MASK_general == TRUE) %>% pull(probeID)
+
+# Filter cross-reactive probes
 betas_processed_198_filtered_pval_nosex_noCrossReactive <- betas_processed_198_filtered_pval_nosex[!rownames(betas_processed_198_filtered_pval_nosex) %in% bad_probes, ]
 
-# > dim(betas_processed_198_filtered_pval_nosex_noCrossReactive)
+dim(betas_processed_198_filtered_pval_nosex_noCrossReactive)
 # [1] 341452    198
 
 
-# 4. Remove batch effect:
+# 4. ------------------------- Remove batch effect -------------------------
 
-## Get beta values to m values:
+# 4.1 Get beta values to m values
 m_values_processed_198 <- BetaValueToMValue(
   b = betas_processed_198_filtered_pval_nosex_noCrossReactive
 )
@@ -186,12 +223,12 @@ metadata_filtered_isAD_methyl_processed_198 <- metadata_filtered_isAD_methyl_211
 
 # Check that all samples in m_values object matches order in metadata (needed for batch effect removing):
 all(metadata_filtered_isAD_methyl_processed_198$sampleID == colnames(m_values_processed_198))
-#[1] TRUE
+# [1] TRUE
 
-# Remove known batch effect:
+# 4.2 Remove known batch effect
 
-## set batch:
-# That's why we need same order in metadata and  samples m_values object
+# set batch
+# (That's why we need same order in metadata and  samples m_values object)
 batch <- metadata_filtered_isAD_methyl_processed_198$batch
 
 ## Set protecting model (this is biology, do not touch it):
@@ -203,15 +240,15 @@ m_values_processed_198_noBatch <- ComBat(
                             batch = batch,
                               mod = model
                             )
-#Found2batches
-#Adjusting for1covariate(s) or covariate level(s)
-#Standardizing Data across genes
-#Fitting L/S model and finding priors
-#Finding parametric adjustments
-#Adjusting the Data
+# Found2batches
+# Adjusting for1covariate(s) or covariate level(s)
+# Standardizing Data across genes
+# Fitting L/S model and finding priors
+# Finding parametric adjustments
+# Adjusting the Data
 
 
-## Remove unknown batch effect:
+# 4.3 Remove unknown batch effect
 
 # set models:
 model <- model.matrix(~as.factor(is_AD), metadata_filtered_isAD_methyl_processed_198)
@@ -223,12 +260,17 @@ svobj <- sva(
   mod =  model,
  mod0 = model0
 )
+# Number of significant surrogate variables is:  22
+# Iteration (out of 5 ):1  2  3  4  5 
 
-# Remove unknown batch effect (limma):
+# Remove unknown batch effect (limma)
 m_values_processed_198_noBatch_unknownSVA<- removeBatchEffect(
     x = m_values_processed_198_noBatch,
   covariates = svobj$sv, design = model
 )
+
+# QC Analysis finished
+
 
 
 
