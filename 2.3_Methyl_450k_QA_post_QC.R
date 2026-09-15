@@ -12,6 +12,7 @@ library(vroom)        # ‘1.7.1’
 
 
 #         -- Workflow --
+#
 # 1. ----- QA Analysis -----
 # 1.1 Success probes
 # 1.2 Get stats per sample
@@ -273,3 +274,9 @@ pdf("pca_m_processed_noBatch_unkwnonSVA_198_SentrixID.pdf")
 dev.off()
 
 # ------------------------- QA Analysis finished (post QC) -------------------------
+
+# Save data
+saveRDS(object = m_values_processed_198_noBatch_unknownSVA, file = "ROSMAP_methyl450k_mvalues_filtered_198.rds")
+
+# Save metadata
+vroom_write(x = metadata_filtered_isAD_methyl_processed_198, file = "ROSMAP_methyl450k_metadata_filtered_198.tsv")
