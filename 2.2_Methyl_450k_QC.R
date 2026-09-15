@@ -79,6 +79,7 @@ length(idats_raw_202)
 
 
 # 1.4 Detect and remove outliers using Mahalanabis distance alghorithm
+
 pca_scores <- pca_m_raw_211$x[,1:10]
 
 md <- mahalanobis(
@@ -110,11 +111,12 @@ idats_raw_198 <- idats_raw_202[!names(idats_raw_202) %in% outlier_samples]
 
 
 # 2.1 Sesame preprocessing
+
 # Description: 
 # Mask potential bad probes ---> (qualityMask)
 # Infer color channel       ---> (inferInfiniumIChannel)
 # Dye bias correction       ---> (dyeBiasNL)
-# pOOBAH                    ---> (Background substraction)
+# Background substraction   ---> (pOOBAH)   
 # Normalization             ---> (noob)
 
 idats_processed_198 <- bplapply(
@@ -136,6 +138,7 @@ idats_processed_198 <- bplapply(
 )
 
 # 2.2 Get betas in matrix format
+
 betas_processed_198 <- do.call(
                   cbind,
                   lapply(
@@ -163,6 +166,7 @@ dim(betas_processed_198_filtered)
 
 
 # 3.2 Remove probes that fail in at least 1% of samples (considering pvalue > 0.01):
+
 bad_probes <- rownames(pvalues)[rowMeans(pvalues > 0.01) >= 0.01]
 
 ## Filter bad probes:
@@ -210,20 +214,22 @@ dim(betas_processed_198_filtered_pval_nosex_noCrossReactive)
 # [1] 341452    198
 
 
+
 # 4. ------------------------- Remove batch effect -------------------------
 
 # 4.1 Get beta values to m values
+
 m_values_processed_198 <- BetaValueToMValue(
   b = betas_processed_198_filtered_pval_nosex_noCrossReactive
 )
 
-
-# Filter metadata (to 198 subjects):
+# Filter metadata (to 198 subjects)
 metadata_filtered_isAD_methyl_processed_198 <- metadata_filtered_isAD_methyl_211 %>% filter(sampleID %in% colnames(m_values_processed_198))
 
-# Check that all samples in m_values object matches order in metadata (needed for batch effect removing):
+# Check that all samples in m_values object matches order in metadata (needed for batch effect removing)
 all(metadata_filtered_isAD_methyl_processed_198$sampleID == colnames(m_values_processed_198))
 # [1] TRUE
+
 
 # 4.2 Remove known batch effect
 
@@ -231,10 +237,10 @@ all(metadata_filtered_isAD_methyl_processed_198$sampleID == colnames(m_values_pr
 # (That's why we need same order in metadata and  samples m_values object)
 batch <- metadata_filtered_isAD_methyl_processed_198$batch
 
-## Set protecting model (this is biology, do not touch it):
+# Set protecting model (this is biology, do not touch it):
 model <- model.matrix(~as.factor(is_AD), metadata_filtered_isAD_methyl_processed_198)
 
-## Remove known batch effect: batch
+# Remove known batch effect: batch
 m_values_processed_198_noBatch <- ComBat(
                               dat = m_values_processed_198,
                             batch = batch,
@@ -269,7 +275,7 @@ m_values_processed_198_noBatch_unknownSVA<- removeBatchEffect(
   covariates = svobj$sv, design = model
 )
 
-# QC Analysis finished
+# ------------------------- QC Analysis finished -------------------------
 
 
 
@@ -283,18 +289,19 @@ pca_m_processed_198_noBatch <- prcomp(
   x = t(m_values_processed_198_noBatch),
   scale. = TRUE)
 
-# Change format to data frame (for plotting):
-
+# Change format to data frame (for plotting)
 pca_m_processed_198_noBatch_df <- data.frame(
   sample = rownames(pca_m_processed_198_noBatch$x),
   X = pca_m_processed_198_noBatch$x[,1],
   Y = pca_m_processed_198_noBatch$x[,2]
 )
 
+# Get % variance per PCs
 pca_var_processed_198 <- pca_m_processed_198_noBatch$sdev^2
+
 pca_var_processed_198_per <- round(pca_var_processed_198 / sum(pca_var_processed_198) * 100, 1)
 
-# Check order for colouring:
+# Check order for colouring
 all(metadata_filtered_isAD_methyl_processed_198$sampleID == pca_m_processed_198_noBatch_df$sample)
 #[1] TRUE
 
