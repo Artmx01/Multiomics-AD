@@ -16,6 +16,7 @@ library(EDASeq)    # ‘2.46.0’
 #
 # 1.----- Metadata -----
 # 1.1 Load metadata
+# 1.2 Filter RNAseq metadata
 #
 # 2.----- Data -----
 # 2.1 Load data
@@ -38,10 +39,17 @@ library(EDASeq)    # ‘2.46.0’
 
 # 1. ------------------------- Metadata -------------------------
 
-# Load metadata:
+# 1.1 Load metadata:
+
+#Load RNAseq metadata
 RNA_seq_metadata_filteredQC_DLPFC <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/mRNA/RNA_seq_metadata_filteredQC_DLPFC.txt")
 
-# Filter metadata (subjects with 3 omics & AD/Control):
+# Load metadata (subjects with 3 omics & AD/control)
+metadata_filtered_isAD <- readRDS(file = "/STORAGE/csbig/multiomics-Arturo/methyl_data/preprocessing/metadata_filtered_multiomics_isAD_215.rds")
+
+
+# 1.2 Filter RNAseq metadata (subjects with 3 omics & AD/Control):
+
 RNA_seq_metadata_filteredQC_DLPFC_215 <- RNA_seq_metadata_filteredQC_DLPFC %>%
     filter(individualID %in% metadata_filtered_isAD$individualID) %>% 
     distinct(individualID, .keep_all = TRUE) %>% 
