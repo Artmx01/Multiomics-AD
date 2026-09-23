@@ -1,18 +1,42 @@
-##############################
-QA ANALYSIS (with raw counts)
-##############################
-
-# 03/09/2026
+######################################
+# RNAseq QA ANALYSIS (with raw counts)
+######################################
 
 
+# Packages
 library(vroom)     # ‘1.7.1’
 library(tidyverse) # ‘2.0.0’
 library(NOISeq)    # ‘2.56.0’
 library(biomaRt)   # ‘2.68.0’
 library(EDASeq)    # ‘2.46.0’
 
-# 1. METADATA
-################
+
+
+#                  -- Worflow --
+#
+# 1.----- Metadata -----
+# 1.1 Load metadata
+#
+# 2.----- Data -----
+# 2.1 Load data
+# 2.2 Remove duplicated rows (median expression)
+# 2.3 Filter data (3 omics & AD/control)
+#
+# 3.----- QA Analysis -----
+# 3.1 Mart Annotation 
+# 3.2 Create NOISeq object
+# 3.3 Check low counts
+# 3.4 GC bias
+# 3.5 Length bias
+# 3.6 RNA composition bias
+# 3.7 meanVar plot
+# 3.8 PCA
+#
+# QA Analysis finished
+
+
+
+# 1. ------------------------- Metadata -------------------------
 
 # Load metadata:
 RNA_seq_metadata_filteredQC_DLPFC <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/mRNA/RNA_seq_metadata_filteredQC_DLPFC.txt")
@@ -32,17 +56,23 @@ RNA_seq_metadata_filteredQC_DLPFC_215 <- RNA_seq_metadata_filteredQC_DLPFC %>%
 # [1] 215  42
 
 
-# 2. DATA
-############
 
-# Load data:
+# 2. ------------------------- Data -------------------------
+
+# 2.1 Load data:
+
 rnaseq_counts_raw <- readRDS(file = "/STORAGE/csbig/multiomics-Arturo/mRNA/ROSMAP_RNAseq_rawcounts_DLPFC.rds")
+
+
+# 2.2 Remove duplicated rows (with his median expression):
+
+# As in: 
+# https://github.com/paulinapglz99/Multinetwork-topologic-analysis/blob/main/00_preprocessing/2.pre-pro-mRNA_ARSyn.R
+
 
 # strip transcript or gene version numbers from identifiers 
 rnaseq_counts_raw <- rnaseq_counts_raw %>%
     mutate(feature = str_remove(feature, "\\..*$"))
-
-# Filter repeated features with his median expression:
 
 # Get repeated features
 repeated_features <- rnaseq_counts_raw %>%
@@ -64,8 +94,7 @@ repeated_rows <- repeated_rows %>%
     group_by(feature) %>%
     summarize(across(everything(), \(x) median(x, na.rm = TRUE)))
 
-
-# Remove duplicate rows and add rows with the calculated median
+# Remove duplicated rows and add rows with the calculated median
 rnaseq_counts_raw <- rnaseq_counts_raw %>% filter(!feature %in% repeated_rows$feature)
 
 rnaseq_counts_raw <- bind_rows(rnaseq_counts_raw, repeated_rows)
@@ -77,7 +106,7 @@ rnaseq_counts_raw <- column_to_rownames(rnaseq_counts_raw, var = "feature")
 # [1] 60562  1141
 
 
-# Filter data (subjects with 3 omics & AD/Control):
+# 2.3 Filter data (3 omics & AD/control)
 
 # Get subjects
 subjects <- RNA_seq_metadata_filteredQC_DLPFC_215$specimenID
@@ -89,11 +118,10 @@ rnaseq_counts_raw_215 <- rnaseq_counts_raw[,subjects]
 # [1] 60562   215
 
 
-#############
-# QA Analysis
-#############
 
-# Annotation Mart:
+# 3. ------------------------- QA Analysis -------------------------
+
+# 3.1  Mart Annotation:
 
 # Get mart
 mart <- useEnsembl("ensembl", dataset="hsapiens_gene_ensembl", version = 110)
@@ -103,14 +131,16 @@ myannot <- getBM(attributes = c("ensembl_gene_id", "chromosome_name",
                                 "percentage_gene_gc_content", "gene_biotype",
                                 "start_position","end_position","hgnc_symbol"),
                  filters = "ensembl_gene_id",
-                 values =  rownames(rnaseq_counts_raw_215),
-                 mart = mart)
+                 values  =  rownames(rnaseq_counts_raw_215),
+                 mart    = mart)
 
 
-# Create NOISeq object:
+# 3.2 Create NOISeq object:
 
 # Set factors object (necessary in NOISeq object)
-factors <- RNA_seq_metadata_filteredQC_DLPFC_215 %>% dplyr::select(specimenID, is_AD, sequencingBatch, libraryBatch)
+factors <- RNA_seq_metadata_filteredQC_DLPFC_215 %>% 
+            dplyr::select(specimenID, is_AD, sequencingBatch, libraryBatch)
+
 factors <- as.data.frame(factors)
 
 # Check order btw data & factors
@@ -137,7 +167,7 @@ noiseqData_raw <- NOISeq::readData(data = rnaseq_counts_raw_215,
 
 # Diagnostic Plots:
 
-# 1.  Check low counts:
+# 3.3 Check low counts:
 
 mycountsbio_raw <- dat(noiseqData_raw,
                    type =  "countsbio",
@@ -159,7 +189,7 @@ explo.plot(mycountsbio_raw,
 dev.off()
 
 
-# 2. GC bias:
+# 3.4 GC bias:
 
 myGCcontent_raw <- dat(noiseqData_raw,
                    k = 0,            # A feature is considered to be detected if the corresponding number of read counts is > k.
@@ -185,7 +215,7 @@ explo.plot(myGCcontent_AD_raw,
 dev.off()
 
 
-# 3. Length bias:
+# 3.5 Length bias:
 
 mylengthbias_raw <- dat(noiseqData_raw,
                     k = 0,
@@ -211,7 +241,7 @@ explo.plot(mylengthbias_AD_raw,
 dev.off()
 
 
-# 4. RNA composition bias:
+# 3.6 RNA composition bias:
 
 rna_comp_bias <- dat(input = noiseqData_raw, type = "cd", norm = FALSE)
 
@@ -220,7 +250,8 @@ pdf("counts_raw_215_rna_comp_bias.pdf")
 explo.plot(rna_comp_bias, samples = 1:12)
 dev.off()
 
-# 5. meanVar plot:
+
+# 3.7 meanVar plot:
 
 # Average gene expresión
 avg_gene_exps_raw_215 <- rowMeans(rnaseq_counts_raw_215)
@@ -240,7 +271,7 @@ plot(
 dev.off()
 
 
-# 6. PCA:
+# 3.8 PCA:
 
 # get PCA
 pca_rnaseq_raw_215 <- prcomp(x = t(rnaseq_counts_raw_215), center = TRUE, scale. = FALSE)
@@ -279,4 +310,4 @@ dev.off()
 
 # PCA (color = sequencingBatch)
 
-#---QA Analysis finished---#
+# ------------------------ QA Analysis finished -------------------------
