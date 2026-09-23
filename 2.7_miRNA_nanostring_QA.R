@@ -2,6 +2,7 @@
 # MiRNA data preprocessing: QA Analysis
 #############################################
 
+
 # Packages
 library(vroom)       # ‘1.7.1’
 library(tidyverse)   # ‘2.0.0’
@@ -9,20 +10,34 @@ library(CePa)        # ‘0.8.2’
 
 
 
-# QA Analysis workflow:
-# 1. Load & filter metadata
-# 2. Load & filter data
-# 3. Check data values distribution (boxplot)
-# 4. Check mean variance relation
-# 5. PCA
+#        -- Workflow --
+#
+# 1. ----- Metadata -----
+# 1.1 Load metadata
+# 1.2 Filter metadata
+#
+# 2.----- Data -----
+# 2.1 Load data
+# 2.2 Filter data
+#
+# 3.----- QA Analysis -----
+# 3.1 Check data values distribution (boxplot)
+# 3.2 Check mean variance relation
+# 3.3 PCA
+#
 # Save filtered data
 
 
 
-# 1. Load metadata:
+# 1. ------------------------- Metadata -------------------------
+
+# 1.1 Load metadata:
 
 # Load mirna_assay_nanostring_metadata
 mirna_assay_nanostring_metadata <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/miRNA_data/ROSMAP_assay_miRNAarray_nanostring_metadata.csv")
+
+
+# 1.2 Filter metadata:
 
 # Filter metadata mirna_assay_nanostring_metadata
 
@@ -39,7 +54,10 @@ mirna_assay_nanostring_metadata_filtered_189 <- mirna_assay_nanostring_metadata 
 # OBS: Not all subjects match metadata (215 expected)
 
 
-# 2. Load data (gct file):
+
+# 2. ------------------------- Data -------------------------
+
+# 2.1 Load data (gct file):
 
 mirna_processed <- read.gct(file = "/STORAGE/csbig/multiomics-Arturo/miRNA_data/ROSMAP_arraymiRNA.gct")
 
@@ -47,7 +65,10 @@ mirna_processed <- read.gct(file = "/STORAGE/csbig/multiomics-Arturo/miRNA_data/
 # [1] 309 702
 # 309 miRNAs, 702 subjects
 
-# Filter data (only subjects in mirna_assay_nanostring_metadata_filtered_189)
+
+# 2.2 Filter data:
+
+# Only subjects in mirna_assay_nanostring_metadata_filtered_189
 
 # Get subjects ID
 sampleID_DLPFC <- mirna_assay_nanostring_metadata_filtered_189 %>%
@@ -61,11 +82,10 @@ mirna_processed_188 <- mirna_processed[,colnames(mirna_processed) %in% sampleID_
 # OBS: We need to filter metadata again (in PCA)
 
 
-#############
-# QA Analysis
-#############
 
-# 3. Check data values distribution (boxplot)
+# 3. ------------------------- QA Analysis -------------------------
+
+# 3.1 Check data values distribution (boxplot):
 
 # Range
 range(mirna_processed_188)
@@ -81,7 +101,8 @@ boxplot(
 )
 dev.off()
 
-# 4. Check mean variance relation
+
+# 3.2 Check mean variance relation:
 
 avg_mirna_xprsn <- rowMeans(mirna_processed_188)
 
@@ -99,7 +120,7 @@ plot(
 dev.off()
 
 
-# 5. PCA:
+# 3.3 PCA:
 
 pca_mirna_processed_188 <- prcomp(
              x = t(mirna_processed_188), 
@@ -158,8 +179,8 @@ dev.off()
 # Summary of QA:
 # Data properly already filtered
 
-#------------------------------------------
-#------------------------------------------
+# ------------------------- QA Analysis finished -------------------------
+
 
 # Save filtered data
 saveRDS(object = mirna_processed_188, file = "ROSMAP_mirna_counts_filtered_215.rds")
