@@ -9,7 +9,7 @@ library(tidyverse) # ‘2.0.0’
 
 
 
-#           -- Workflow --
+#            -- Workflow --
 #
 # ----- 1. Load filtered data -----
 # 1.1 Load methyl data & metadata
@@ -18,7 +18,7 @@ library(tidyverse) # ‘2.0.0’
 #
 # ---- 2. Build matrices for SGCCA ----
 # 2.1 Split AD & Control data
-# 2.1 Build Control matrix
+# 2.2 Build Control matrix
 # 2.2 Build AD matrix
 
 
@@ -173,7 +173,7 @@ dim(mirna_AD_data)
 
 
 
-# 2.1 Build Control matrix:
+# 2.2 Build Control matrix:
 
 # Get control subjects with the 3 omics
 control_subjects_sgcca <- intersect(x = colnames(methyl_control_data), y = colnames(rnaseq_control_data)) %>% 
@@ -220,21 +220,48 @@ sgcca_control_data <- list(
 )
 
 
-# 2.2 Build AD matrix:
+# 2.3 Build AD matrix:
+
+# Get AD subjects with the 3 omics
+ad_subjects_sgcca <- intersect(x = colnames(methyl_AD_data), y = colnames(rnaseq_AD_data)) %>%
+                      intersect( x = ., y = colnames(mirna_AD_data))
+
+length(ad_subjects_sgcca)
+# [1] 102 // 102  AD subjects with 3 omics after data preprocessed
+
+# Filter AD datasets
+methyl_AD_data <- methyl_AD_data[, ad_subjects_sgcca]
+
+rnaseq_AD_data <- rnaseq_AD_data[, ad_subjects_sgcca]
+
+mirna_AD_data <- mirna_AD_data[, ad_subjects_sgcca]
 
 
+# Transpose datasets
+methyl_AD_data <- t(methyl_AD_data)
+# dim(methyl_AD_data)
+# [1]    102 341452
 
+rnaseq_AD_data <- t(rnaseq_AD_data)
+# dim(rnaseq_AD_data)
+# [1]   102 15045
 
+mirna_AD_data <- t(mirna_AD_data)
+# dim(mirna_AD_data)
+# [1] 102 309
 
+# Build SGCCA AD data:
 
+# Order of rows between datasets MUST BE the same
+identical(rownames(methyl_AD_data), rownames(rnaseq_AD_data))
+# [1] TRUE
 
+identical(rownames(methyl_AD_data), rownames(mirna_AD_data))
+# [1] TRUE
 
-
-
-
-
-
-
-
-
-
+# SGCCA AD data
+sgcca_AD_data <- list(
+  methyl = methyl_AD_data, 
+  rnaseq = rnaseq_AD_data, 
+  mirna  = mirna_AD_data
+)
