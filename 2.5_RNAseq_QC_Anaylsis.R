@@ -1,6 +1,7 @@
 ######################
-# QC RNAseq data
+# RNAseq QC Analysis
 ######################
+
 
 # Packages
 library(vroom)     # ‘1.7.1’
@@ -10,17 +11,19 @@ library(biomaRt)   # ‘2.68.0’
 library(EDASeq)    # ‘2.46.0’
 
 
-# QC RNAseq workflow:
+
+#                     -- Workflow --
+#
 # 1. Filter low counts (CPM > 1)
 # 2. Adjust GC bias with EDASeq
-# 3. Normalize with TMM method
+# 3. Adjust RNA composition & Normalize (TMM method)
 # 4. Filter genes: only protein-coding, miRNAs, lncRNAs
 # 5. Stabilize mean-variance relation (important for SGCCA)
 # 6. Remove batch effect
 
 
 
-# 1. Filter low counts (CPM > 1):
+# 1. ------------------------- Filter low counts (CPM > 1) -------------------------
 
 # Filter low counts
 rnaseq_counts_filtered_215_CPM <- filtered.data(
@@ -39,7 +42,8 @@ rnaseq_counts_filtered_215_CPM <- filtered.data(
 # [1] 15677   215
 
 
-# 2. Adjust GC bias with EDASeq:
+
+# 2. ------------------------- Adjust GC bias with EDASeq -------------------------
 
 # Build phenoData
 phenoData <- factors %>% column_to_rownames(var = "specimenID")
@@ -93,7 +97,8 @@ rnaseq_counts_filtered_215_CPM_noGCbias <- withinLaneNormalization(
 )
 
 
-# 3. Normalize with TMM method
+
+# 3. ------------------------- Adjust RNA composition & Normalize with TMM method -------------------------
 
 # Create NOISEq object with noGCbias data
 
@@ -123,17 +128,14 @@ rnaseq_counts_filtered_215_CPM_noGCbias_TMM<- tmm(
             lc = 0,
 )
 
-# range(rnaseq_counts_filtered_215_CPM_noGCbias_TMM)
-# [1]       0 2016613
-
-# range(rnaseq_counts_raw_215)
-# [1]        0 29564642
 
 
-# 4. Filter genes: only protein-coding, miRNAs, lncRNAs:
+# 4. ------------------------- Filter genes: only protein-coding, miRNAs, lncRNAs -------------------------
 
 # Get genes (features) of interest
-keep_protein_coding_miRNAs_lncRNAs <- myannot_CPM %>% filter(gene_biotype %in% c("protein_coding", "miRNA", "lncRNA")) %>% pull(ensembl_gene_id)
+keep_protein_coding_miRNAs_lncRNAs <- myannot_CPM %>%
+    filter(gene_biotype %in% c("protein_coding", "miRNA", "lncRNA")) %>%
+    pull(ensembl_gene_id)
 
 # Filter counts with genes of interest (vector)
 rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures <- rnaseq_counts_filtered_215_CPM_noGCbias_TMM[rownames(rnaseq_counts_filtered_215_CPM_noGCbias_TMM) %in% keep_protein_coding_miRNAs_lncRNAs, ]
@@ -142,12 +144,15 @@ rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures <- rnaseq_counts_fi
 # [1] 15045   215
 
 
-# 5. Stabilize mean-variance relation (important for SGCCA):
 
+# 5. ------------------------- Stabilize mean-variance relation (important for SGCCA) -------------------------
+
+# Stabilize mean-variance dependency
 rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures <- log2(rnaseq_counts_filtered_215_CPM_noGCbias_TMM_selectedFeatures + 1)
 
 
-# 6. Remove batch effect:
+
+# 6. ------------------------- Remove batch effect -------------------------
 
 # Create NOISeq object with filtered selected features
 
@@ -183,4 +188,6 @@ noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch <- ARSyNseq(
         batch     = TRUE, 
         norm      = "n", 
         logtransf = FALSE)
-                
+
+
+# ------------------------- QC Analysis finished -------------------------
