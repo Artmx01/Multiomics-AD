@@ -67,8 +67,7 @@ penalties_AD_permut_500 <- rgcca_permutation(
   blocks     = sgcca_AD_data,                   # data
   ncomp      = ncomp_AD_permut_500$best_params, # Best ncomp params
   par_type   = "sparsity",                      # Parameter to tune
-  par_value  = 0.3,                             # Max penalty to evaluate
-  par_length = 30,                              # 30 penalties
+  par_length = 10,                              # 30 penalties
   n_perms    = 500,                             # default value (n = 20)
   n_cores    = 3,                               # Parallelize
   scale      = TRUE,                            # Data not scaled
@@ -77,7 +76,7 @@ penalties_AD_permut_500 <- rgcca_permutation(
   scheme     = "centroid",                      # Centroid scheme allows negative correlation
   scale_block = "lambda1"                       # each block is divided by the square root of the highest eigenvalue of its empirical covariance matrix.
 )
-saveRDS(object = penalties_AD_permut_500, file = "penalties_AD_permut_500.rds")
+saveRDS(object = penalties_AD_permut_500, file = "penalties_AD_permut_500_v2.rds")
 
 
 
@@ -85,8 +84,8 @@ saveRDS(object = penalties_AD_permut_500, file = "penalties_AD_permut_500.rds")
 
 # 2.1 Tune ncomp param (Control data):
 
-blas_set_num_threads(14)
-omp_set_num_threads(14)
+blas_set_num_threads(20)
+omp_set_num_threads(20)
 
 ncomp_control_permut_500 <- rgcca_permutation(
   blocks      = sgcca_control_data,             # data
@@ -114,10 +113,9 @@ penalties_control_permut_500 <- rgcca_permutation(
   blocks     = sgcca_control_data,                   # data
   ncomp      = ncomp_control_permut_500$best_params,
   par_type   = "sparsity",                           # Parameter to tune
-  par_value  = 0.3,                                  # Penalties to evaluate
-  par_length = 30,
+  par_length = 10,                                   # 10 combinations of penalties
   n_perms    = 500,                                  # default value (n = 20)
-  n_cores    = 2,                                    # Parallelize
+  n_cores    = 3,                                    # Parallelize
   scale      = TRUE,                                 # Data not scaled
   method     = "sgcca",                              # SGCCA method
   connection = design,                               # Design matrix
