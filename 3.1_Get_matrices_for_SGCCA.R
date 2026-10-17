@@ -96,7 +96,7 @@ mirna_individualIDs <- mirna_metadata %>% pull(individualID)
 colnames(mirna_data) <- mirna_individualIDs
 
 
-# Keep 50% of features with highest variance for each block:
+# Keep 50% of features with highest variance for methylation block:
 
 # methyl block:
 methyl_var <- apply(methyl_data, 1, var)
@@ -106,19 +106,6 @@ keep_CpG <- names(head(methyl_highest_var, length(methyl_highest_var) / 2))
 methyl_data <- methyl_data[rownames(methyl_data) %in% keep_CpG, ]
 
 
-# rnaseq block:
-rnaseq_var <- apply(rnaseq_data, 1, var)
-order_rnaseq <- order(rnaseq_var, decreasing = TRUE)
-rnaseq_highest_var <- rnaseq_var[order_rnaseq]
-keep_rnaseq <- names(head(rnaseq_highest_var, length(rnaseq_highest_var) / 2))
-rnaseq_data <- rnaseq_data[rownames(rnaseq_data) %in% keep_rnaseq, ]
-
-# mirna block:
-mirna_var <- apply(mirna_data, 1, var)
-order_mirna <- order(mirna_var, decreasing = TRUE)
-mirna_highest_var <- mirna_var[order_mirna]
-keep_mirna <- names(head(mirna_highest_var, length(mirna_highest_var) / 2))
-mirna_data <- mirna_data[rownames(mirna_data) %in% keep_mirna, ]
 
 # 2.1 Split AD & Control data:
 
@@ -145,7 +132,7 @@ rnaseq_control_subjects <- rnaseq_metadata %>%
 rnaseq_control_data <- rnaseq_data[, rnaseq_control_subjects]
 
 dim(rnaseq_control_data)
-# [1] 7522   88
+# [1] 15045    88
 
 
 # miRNA Control data
@@ -157,7 +144,7 @@ mirna_control_subjects <- mirna_metadata %>%
 mirna_control_data <- mirna_data[, mirna_control_subjects]
 
 dim(mirna_control_data)
-# [1] 154  76
+# [1] 309  76
 
 
 # Methyl AD data
@@ -181,7 +168,7 @@ rnaseq_AD_subjects <- rnaseq_metadata %>%
 rnaseq_AD_data <- rnaseq_data[, rnaseq_AD_subjects]
 
 dim(rnaseq_AD_data)
-# [1] 7522  127
+# [1] 15045   127
 
 
 # miRNA AD data
@@ -193,7 +180,7 @@ mirna_AD_subjects <- mirna_metadata %>%
 mirna_AD_data <- mirna_data[, mirna_AD_subjects]
 
 dim(mirna_AD_data)
-# [1] 154 112
+# [1] 309 112
 
 
 
@@ -243,13 +230,14 @@ sgcca_control_data <- list(
 
 lapply(sgcca_control_data,dim)
 # $methyl
-# [1] 71 170726
+# [1]     71 170726
 
 # $rnaseq
-# [1] 71 7522
+# [1]    71 15045
 
 # $mirna
-# [1] 71 154
+# [1]  71 309
+
 
 # 2.3 Build AD matrix:
 
@@ -297,7 +285,8 @@ lapply(sgcca_AD_data, dim)
 # [1]    102 170726
 
 # $rnaseq
-# [1]  102 7522
+# [1]   102 15045
 
 # $mirna
-# [1] 102 154
+# [1] 102 309
+
