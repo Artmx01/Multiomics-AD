@@ -31,8 +31,8 @@ design <- matrix(
   byrow = TRUE
 )
 
-blas_set_num_threads(10)
-omp_set_num_threads(10)
+blas_set_num_threads(20)
+omp_set_num_threads(20)
 
 
 # ------------------------- 1.Tune Params for AD Data -------------------------
@@ -55,11 +55,13 @@ ncomp_AD_permut_500 <- rgcca_permutation(
   scheme      = "centroid",                     # Centroid scheme allows negative correlation. maximization of the sum of the absolute values of the covariances
   scale_block = "lambda1"                      # each block is divided by the square root of the highest eigenvalue of its empirical covariance matrix.
 )
+saveRDS(object = ncomp_AD_permut_500, file = "ncomp_AD_permut_500_highestVar.rds")
 # |++++++++++++++++++++++++++++++++++++++++++++++++++| 100% elapsed=01d 07h 40m 59s
 
+
+
 # ncomp_AD_permut_500$best_params
-# methyl rnaseq  mirna
-#     3      3      3
+
 
 
 # 1.2 Tune penalties param (AD data):
@@ -76,7 +78,7 @@ penalties_AD_permut_500 <- rgcca_permutation(
   scheme     = "centroid",                      # Centroid scheme allows negative correlation
   scale_block = "lambda1"                       # each block is divided by the square root of the highest eigenvalue of its empirical covariance matrix.
 )
-saveRDS(object = penalties_AD_permut_500, file = "penalties_AD_permut_500_v2.rds")
+
 
 
 
@@ -93,13 +95,15 @@ ncomp_control_permut_500 <- rgcca_permutation(
   par_value   = 5,                              # evaluate max 5 comps
   par_length  = 5,                              # 1 by 1
   n_perms     = 500,                            # default value (n = 20)
-  n_cores     = 2,                              # Parallelize
+  n_cores     = 3,                              # Parallelize
   scale       = TRUE,                           # Data not scaled
   method      = "sgcca",                        # SGCCA method
   connection  = design,                         # Design matrix
   scheme      = "centroid",                     # Centroid scheme allows negative correlation
   scale_block = "lambda1"                      # each block is divided by the square root of the highest eigenvalue of its empirical covariance matrix.
 )
+saveRDS(object = ncomp_control_permut_500, file = "ncomp_control_permut_500_highestVar.rds")
+
 # |++++++++++++++++++++++++++++++++++++++++++++++++++| 100% elapsed=01d 11h 26m 34s
 
 # ncomp_control_permut_500$best_params
