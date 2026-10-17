@@ -66,8 +66,6 @@ mirna_metadata <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/miRNA_data/prep
 # ------------------------- 2. Build matrices for SGCCA -------------------------
 
 
-# 2.1 Split AD & Control data:
-
 # Change methyl data colnames (sampleID) to individualID:
 
 identical(colnames(methyl_data), methyl_metadata$sampleID)
@@ -98,6 +96,32 @@ mirna_individualIDs <- mirna_metadata %>% pull(individualID)
 colnames(mirna_data) <- mirna_individualIDs
 
 
+# Keep 50% of features with highest variance for each block:
+
+# methyl block:
+methyl_var <- apply(methyl_data, 1, var)
+order_meth <- order(methyl_var, decreasing = TRUE)
+methyl_highest_var <- methyl_var[order_meth]
+keep_CpG <- names(head(methyl_highest_var, length(methyl_highest_var) / 2))
+methyl_data <- methyl_data[rownames(methyl_data) %in% keep_CpG, ]
+
+
+# rnaseq block:
+rnaseq_var <- apply(rnaseq_data, 1, var)
+order_rnaseq <- order(rnaseq_var, decreasing = TRUE)
+rnaseq_highest_var <- rnaseq_var[order_rnaseq]
+keep_rnaseq <- names(head(rnaseq_highest_var, length(rnaseq_highest_var) / 2))
+rnaseq_data <- rnaseq_data[rownames(rnaseq_data) %in% keep_rnaseq, ]
+
+# mirna block:
+mirna_var <- apply(mirna_data, 1, var)
+order_mirna <- order(mirna_var, decreasing = TRUE)
+mirna_highest_var <- mirna_var[order_mirna]
+keep_mirna <- names(head(mirna_highest_var, length(mirna_highest_var) / 2))
+mirna_data <- mirna_data[rownames(mirna_data) %in% keep_mirna, ]
+
+# 2.1 Split AD & Control data:
+
 # Split data:
 
 # Mehtyl Control data
@@ -109,7 +133,7 @@ methyl_control_subjects <- methyl_metadata %>%
 methyl_control_data <- methyl_data[, methyl_control_subjects]
 
 dim(methyl_control_data)
-# [1] 341452     81
+# [1] 170726     81
 
 
 # RNAseq Control data
@@ -121,7 +145,7 @@ rnaseq_control_subjects <- rnaseq_metadata %>%
 rnaseq_control_data <- rnaseq_data[, rnaseq_control_subjects]
 
 dim(rnaseq_control_data)
-# [1] 15045    88
+# [1] 7522   88
 
 
 # miRNA Control data
@@ -133,7 +157,7 @@ mirna_control_subjects <- mirna_metadata %>%
 mirna_control_data <- mirna_data[, mirna_control_subjects]
 
 dim(mirna_control_data)
-# [1] 309  76
+# [1] 154  76
 
 
 # Methyl AD data
@@ -145,7 +169,7 @@ methyl_AD_subjects <- methyl_metadata %>%
 methyl_AD_data <- methyl_data[,methyl_AD_subjects]
 
 dim(methyl_AD_data)
-# [1] 341452    117
+# [1] 170726    117
 
 
 # RNAseq AD data
@@ -157,7 +181,7 @@ rnaseq_AD_subjects <- rnaseq_metadata %>%
 rnaseq_AD_data <- rnaseq_data[, rnaseq_AD_subjects]
 
 dim(rnaseq_AD_data)
-# [1] 15045   127
+# [1] 7522  127
 
 
 # miRNA AD data
@@ -169,7 +193,7 @@ mirna_AD_subjects <- mirna_metadata %>%
 mirna_AD_data <- mirna_data[, mirna_AD_subjects]
 
 dim(mirna_AD_data)
-# [1] 309 112
+# [1] 154 112
 
 
 
@@ -194,13 +218,11 @@ mirna_control_data <- mirna_control_data[, control_subjects_sgcca]
 # Transpose datasets
 
 methyl_control_data <- t(methyl_control_data)
-# [1]     71 341452
 
 rnaseq_control_data <- t(rnaseq_control_data)
-# [1]    71 15045
 
 mirna_control_data <- t(mirna_control_data)
-# [1]  71 309
+
 
 # Build SGCCA control data:
 
@@ -219,6 +241,15 @@ sgcca_control_data <- list(
   mirna  = mirna_control_data
 )
 
+lapply(sgcca_control_data,dim)
+# $methyl
+# [1] 71 170726
+
+# $rnaseq
+# [1] 71 7522
+
+# $mirna
+# [1] 71 154
 
 # 2.3 Build AD matrix:
 
@@ -239,16 +270,11 @@ mirna_AD_data <- mirna_AD_data[, ad_subjects_sgcca]
 
 # Transpose datasets
 methyl_AD_data <- t(methyl_AD_data)
-# dim(methyl_AD_data)
-# [1]    102 341452
 
 rnaseq_AD_data <- t(rnaseq_AD_data)
-# dim(rnaseq_AD_data)
-# [1]   102 15045
 
 mirna_AD_data <- t(mirna_AD_data)
-# dim(mirna_AD_data)
-# [1] 102 309
+
 
 # Build SGCCA AD data:
 
@@ -265,3 +291,13 @@ sgcca_AD_data <- list(
   rnaseq = rnaseq_AD_data, 
   mirna  = mirna_AD_data
 )
+
+lapply(sgcca_AD_data, dim)
+# $methyl
+# [1]    102 170726
+
+# $rnaseq
+# [1]  102 7522
+
+# $mirna
+# [1] 102 154
