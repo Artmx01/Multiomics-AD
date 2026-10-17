@@ -96,13 +96,13 @@ mirna_individualIDs <- mirna_metadata %>% pull(individualID)
 colnames(mirna_data) <- mirna_individualIDs
 
 
-# Keep 50% of features with highest variance for methylation block:
+# Keep 25% of features with highest variance for methylation block:
 
 # methyl block:
 methyl_var <- apply(methyl_data, 1, var)
 order_meth <- order(methyl_var, decreasing = TRUE)
 methyl_highest_var <- methyl_var[order_meth]
-keep_CpG <- names(head(methyl_highest_var, length(methyl_highest_var) / 2))
+keep_CpG <- names(head(methyl_highest_var, length(methyl_highest_var) / 4))
 methyl_data <- methyl_data[rownames(methyl_data) %in% keep_CpG, ]
 
 
@@ -120,7 +120,7 @@ methyl_control_subjects <- methyl_metadata %>%
 methyl_control_data <- methyl_data[, methyl_control_subjects]
 
 dim(methyl_control_data)
-# [1] 170726     81
+# [1] 85363    81
 
 
 # RNAseq Control data
@@ -156,7 +156,7 @@ methyl_AD_subjects <- methyl_metadata %>%
 methyl_AD_data <- methyl_data[,methyl_AD_subjects]
 
 dim(methyl_AD_data)
-# [1] 170726    117
+# [1] 85363   117
 
 
 # RNAseq AD data
@@ -230,13 +230,14 @@ sgcca_control_data <- list(
 
 lapply(sgcca_control_data,dim)
 # $methyl
-# [1]     71 170726
+#[1]    71 85363
 
 # $rnaseq
 # [1]    71 15045
 
 # $mirna
 # [1]  71 309
+
 
 
 # 2.3 Build AD matrix:
@@ -282,11 +283,12 @@ sgcca_AD_data <- list(
 
 lapply(sgcca_AD_data, dim)
 # $methyl
-# [1]    102 170726
+# [1]   102 85363
 
 # $rnaseq
 # [1]   102 15045
 
 # $mirna
 # [1] 102 309
+
 
