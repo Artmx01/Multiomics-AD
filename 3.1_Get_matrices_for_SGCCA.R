@@ -96,199 +96,58 @@ mirna_individualIDs <- mirna_metadata %>% pull(individualID)
 colnames(mirna_data) <- mirna_individualIDs
 
 
-# Keep 25% of features with highest variance for methylation block:
+# Get data with 3 omics:
+subjects_sgcca <- intersect(colnames(methyl_data), colnames(rnaseq_data)) %>% intersect(., colnames(mirna_data))
 
-# methyl block:
-methyl_var <- apply(methyl_data, 1, var)
-order_meth <- order(methyl_var, decreasing = TRUE)
-methyl_highest_var <- methyl_var[order_meth]
-keep_CpG <- names(head(methyl_highest_var, length(methyl_highest_var) / 4))
-methyl_data <- methyl_data[rownames(methyl_data) %in% keep_CpG, ]
+# length(subjects_sgcca)
+# [1] 173
+# From which:
+# 102 AD
+# 71 noAD
 
+# Filter data with 3 omics
+methyl_sgcca_data <- methyl_data[,subjects_sgcca]
 
+rnaseq_sgcca_data <- rnaseq_data[, subjects_sgcca]
 
-# 2.1 Split AD & Control data:
+mirna_sgcca_data <- mirna_data[, subjects_sgcca]
 
-# Split data:
-
-# Mehtyl Control data
-
-methyl_control_subjects <- methyl_metadata %>%
-                            filter(is_AD == "control") %>%
-                            pull(individualID)
-
-methyl_control_data <- methyl_data[, methyl_control_subjects]
-
-dim(methyl_control_data)
-# [1] 85363    81
-
-
-# RNAseq Control data
-
-rnaseq_control_subjects <- rnaseq_metadata %>%
-                            filter(is_AD == "control") %>%
-                            pull(individualID)
-
-rnaseq_control_data <- rnaseq_data[, rnaseq_control_subjects]
-
-dim(rnaseq_control_data)
-# [1] 15045    88
+# dim(methyl_sgcca_data)
+# [1] 341452    173
+#
+# dim(rnaseq_sgcca_data)
+# [1] 15045   173
+#
+# dim(mirna_sgcca_data)
+# [1] 309 173
 
 
-# miRNA Control data
-
-mirna_control_subjects <- mirna_metadata %>%
-                            filter(is_AD == "control") %>%
-                            pull(individualID)
-
-mirna_control_data <- mirna_data[, mirna_control_subjects]
-
-dim(mirna_control_data)
-# [1] 309  76
-
-
-# Methyl AD data
-
-methyl_AD_subjects <- methyl_metadata %>%
-                        filter(is_AD == "AD-NC_SYM") %>%
-                        pull(individualID)
-
-methyl_AD_data <- methyl_data[,methyl_AD_subjects]
-
-dim(methyl_AD_data)
-# [1] 85363   117
-
-
-# RNAseq AD data
-
-rnaseq_AD_subjects <- rnaseq_metadata %>%
-                        filter(is_AD == "AD-NC_SYM") %>%
-                        pull(individualID)
-
-rnaseq_AD_data <- rnaseq_data[, rnaseq_AD_subjects]
-
-dim(rnaseq_AD_data)
-# [1] 15045   127
-
-
-# miRNA AD data
-
-mirna_AD_subjects <- mirna_metadata %>%
-                      filter(is_AD == "AD-NC_SYM") %>%
-                      pull(individualID)
-
-mirna_AD_data <- mirna_data[, mirna_AD_subjects]
-
-dim(mirna_AD_data)
-# [1] 309 112
-
-
-
-# 2.2 Build Control matrix:
-
-# Get control subjects with the 3 omics
-control_subjects_sgcca <- intersect(x = colnames(methyl_control_data), y = colnames(rnaseq_control_data)) %>% 
-                            intersect(x = ., y = colnames(mirna_control_data))
-
-length(control_subjects_sgcca)
-# [1] 71 // 71 Control subjects with 3 omics after data preprocessed
-
-
-# Filter control datasets
-
-methyl_control_data <- methyl_control_data[, control_subjects_sgcca]
-
-rnaseq_control_data <- rnaseq_control_data[, control_subjects_sgcca]
-
-mirna_control_data <- mirna_control_data[, control_subjects_sgcca]
-
-# Transpose datasets
-
-methyl_control_data <- t(methyl_control_data)
-
-rnaseq_control_data <- t(rnaseq_control_data)
-
-mirna_control_data <- t(mirna_control_data)
-
-
-# Build SGCCA control data:
+# Transpose data
+# Reason is sgcca object needs samples in rows and features in columns
+methyl_sgcca_data <- t(methyl_sgcca_data)
+rnaseq_sgcca_data <- t(rnaseq_sgcca_data)
+mirna_sgcca_data <- t(mirna_sgcca_data)
 
 # Order of rows between datasets MUST BE the same
-
-identical(rownames(methyl_control_data), rownames(rnaseq_control_data))
-#[1] TRUE
-
-identical(rownames(methyl_control_data), rownames(mirna_control_data))
+identical(rownames(methyl_sgcca_data), rownames(rnaseq_sgcca_data))
+# [1] TRUE
+identical(rownames(methyl_sgcca_data), rownames(mirna_sgcca_data))
 # [1] TRUE
 
-# SGCCA control data
-sgcca_control_data <- list(
-  methyl = methyl_control_data, 
-  rnaseq = rnaseq_control_data,
-  mirna  = mirna_control_data
+# Build sgcca object input:
+sgcca_data <- list(
+  methyl = methyl_sgcca_data, 
+  rnaseq = rnaseq_sgcca_data,
+  mirna  = mirna_sgcca_data
 )
 
-lapply(sgcca_control_data,dim)
+lapply(sgcca_data, dim)
 # $methyl
-#[1]    71 85363
+# [1]    173 341452
 
 # $rnaseq
-# [1]    71 15045
+# [1]   173 15045
 
 # $mirna
-# [1]  71 309
-
-
-
-# 2.3 Build AD matrix:
-
-# Get AD subjects with the 3 omics
-ad_subjects_sgcca <- intersect(x = colnames(methyl_AD_data), y = colnames(rnaseq_AD_data)) %>%
-                      intersect( x = ., y = colnames(mirna_AD_data))
-
-length(ad_subjects_sgcca)
-# [1] 102 // 102  AD subjects with 3 omics after data preprocessed
-
-# Filter AD datasets
-methyl_AD_data <- methyl_AD_data[, ad_subjects_sgcca]
-
-rnaseq_AD_data <- rnaseq_AD_data[, ad_subjects_sgcca]
-
-mirna_AD_data <- mirna_AD_data[, ad_subjects_sgcca]
-
-
-# Transpose datasets
-methyl_AD_data <- t(methyl_AD_data)
-
-rnaseq_AD_data <- t(rnaseq_AD_data)
-
-mirna_AD_data <- t(mirna_AD_data)
-
-
-# Build SGCCA AD data:
-
-# Order of rows between datasets MUST BE the same
-identical(rownames(methyl_AD_data), rownames(rnaseq_AD_data))
-# [1] TRUE
-
-identical(rownames(methyl_AD_data), rownames(mirna_AD_data))
-# [1] TRUE
-
-# SGCCA AD data
-sgcca_AD_data <- list(
-  methyl = methyl_AD_data, 
-  rnaseq = rnaseq_AD_data, 
-  mirna  = mirna_AD_data
-)
-
-lapply(sgcca_AD_data, dim)
-# $methyl
-# [1]   102 85363
-
-# $rnaseq
-# [1]   102 15045
-
-# $mirna
-# [1] 102 309
-
+# [1] 173 309
 
