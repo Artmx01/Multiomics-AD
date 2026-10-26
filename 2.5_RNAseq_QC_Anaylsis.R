@@ -187,7 +187,8 @@ noiseqData_filtered_215_CPM_noGCbias_TMM_selectedFeatures_noBatch <- ARSyNseq(
         factor    = "sequencingBatch", 
         batch     = TRUE, 
         norm      = "n", 
-        logtransf = FALSE)
+        logtransf = TRUE # Data already log transform
+)
 
 
 # ------------------------- QC Analysis finished -------------------------
