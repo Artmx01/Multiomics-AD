@@ -64,21 +64,28 @@ dev.off()
 
 # Tune ncomp
 
-ncomp_AD_permut_20 <- rgcca_permutation(
+ncomps <- expand.grid(
+            methyl = 1:3,
+            rnaseq = 1:3,
+            mirna  = 1:3
+          )
+
+
+ncomp_permut_50 <- rgcca_permutation(
   blocks      = sgcca_data,                     # data
   sparsity    = penalties_permut_500$best_params,
   par_type    = "ncomp",                        # Parameter to tune
-  par_value   = 3,                              # evaluate max 5 comps
-  par_length  = 3,                              # 1 by 1
-  n_perms     = 20,                            # default value (n = 20)
+  par_value   = ncomps,                              # evaluate max 5 comps
+  n_perms     = 50,                            # default value (n = 20)
   n_cores     = 4,                              # Parallelize
   scale       = TRUE,                           # Data not scaled
   method      = "sgcca",                        # SGCCA method
   connection  = design,                         # Design matrix
   scheme      = "centroid",                     # Centroid scheme allows negative correlation. maximization of the sum of the absolute values of the covariances
-  scale_block = "lambda1",                     # each block is divided by the square root of the highest eigenvalue of its empirical covariance matrix.
-  tol         = 1e-3
+  scale_block = "lambda1"                     # each block is divided by the square root of the highest eigenvalue of its empirical covariance matrix.
 )
+
+
 
 
 ncomp_AD_permut_20$best_params
@@ -89,85 +96,6 @@ pdf("ncomp_AD_permut_20_sgcca_data.pdf")
 plot(ncomp_AD_permut_20)
 dev.off()
 
-
-# En otro script:
-
-library(tidyverse)
-
-subjects_AD_sgcca <- methyl_metadata %>% filter(individualID %in% subjects_sgcca) %>% filter(is_AD == "AD-NC_SYM") %>% pull(individualID)
-
-length(subjects_AD_sgcca)
-# [1] 102
-
-
-subjects_control_sgcca <- methyl_metadata %>% filter(individualID %in% subjects_sgcca) %>% filter(is_AD == "control") %>% pull(individualID)
-
-length(subjects_control_sgcca)
-# [1] 71
-
-
-# Split AD & control Data:
-
-
-methyl_AD_data <- methyl_sgcca_data[subjects_AD_sgcca, ]
-rnaseq_AD_data <- rnaseq_sgcca_data[subjects_AD_sgcca, ]
-mirna_AD_data <- mirna_sgcca_data[subjects_AD_sgcca, ]
-
-# Create sgcca objects for AD & control data:
-
-identical(rownames(methyl_AD_data), rownames(rnaseq_AD_data))
-[1] TRUE
-
-identical(rownames(methyl_AD_data), rownames(mirna_AD_data))
-[1] TRUE
-
-sgcca_AD_data <- list(
-  methyl = methyl_AD_data, 
-  rnaseq = rnaseq_AD_data,
-  mirna  = mirna_AD_data
-)
-
-lapply(sgcca_AD_data, dim)
-$methyl
-[1]    102 341452
-
-$rnaseq
-[1]   102 15045
-
-$mirna
-[1] 102 309
-
-
-# Control data
-
-methyl_control_data <- methyl_sgcca_data[subjects_control_sgcca, ]
-rnaseq_control_data <- rnaseq_sgcca_data[subjects_control_sgcca, ]
-mirna_control_data <- mirna_sgcca_data[subjects_control_sgcca, ]
-
-
-identical(rownames(methyl_control_data), rownames(rnaseq_control_data))
-[1] TRUE
-
-
-identical(rownames(methyl_control_data), rownames(mirna_control_data))
-[1] TRUE
-
-sgcca_control_data <- list(
-  methyl = methyl_control_data,
-  rnaseq = rnaseq_control_data,
-  mirna  = mirna_control_data
-)
-
-
-lapply(sgcca_control_data, dim)
-$methyl
-[1]     71 341452
-
-$rnaseq
-[1]    71 15045
-
-$mirna
-[1]  71 309
 
 
 
