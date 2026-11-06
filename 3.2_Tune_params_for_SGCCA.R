@@ -88,84 +88,13 @@ ncomp_permut_50 <- rgcca_permutation(
 
 
 
-ncomp_AD_permut_20$best_params
+ncomp_permut_50$best_params
 # methyl rnaseq  mirna
 #    1      1      1
 
-pdf("ncomp_AD_permut_20_sgcca_data.pdf")
-plot(ncomp_AD_permut_20)
+pdf("ncomp_permut_50_sgcca_data.pdf")
+plot(ncomp_permut_50)
 dev.off()
-
-
-
-
-# fit SGCCA_MODELS
-
-fit_sgcca_AD <- rgcca(
-  blocks      = sgcca_AD_data,
-  connection  = design,
-  ncomp       = ncomp_AD_permut_20$best_params,
-  scheme      = "centroid",
-  scale       = TRUE,
-  scale_block = "lambda1",
-  method      = "sgcca",
-  sparsity    = penalties_permut_500$best_params,
-)
-
-summary(fit_sgcca_AD)
-Call: method='sgcca', superblock=FALSE, scale=TRUE, scale_block='lambda1',
-init='svd', bias=TRUE, tol=1e-08, NA_method='na.ignore', ncomp=c(1,1,1),
-response=NULL, comp_orth=TRUE
-There are J = 3 blocks.
-The design matrix is:
-       methyl rnaseq mirna
-methyl      0      1     1
-rnaseq      1      0     1
-mirna       1      1     0
-
-The centroid scheme is used.
-Sum_{j,k} c_jk g(cov(X_j a_j, X_k a_k) = 0.1917
-
-The sparsity parameter used for methyl is: 0.08490206 (with 4453
-variables selected)
-The sparsity parameter used for rnaseq is: 0.09080668 (with 208
-variables selected)
-The sparsity parameter used for mirna is: 0.1354807 (with 8 variables selected)
-
-
-                 
-
-fit_sgcca_control <- rgcca(
-  blocks      = sgcca_control_data, 
-  connection  = design, 
-  ncomp       = ncomp_AD_permut_20$best_params,
-  scheme      = "centroid", 
-  scale       = TRUE, 
-  scale_block = "lambda1", 
-  method      = "sgcca", 
-  sparsity    = penalties_permut_500$best_params, 
-)
-                 
-summary(fit_sgcca_control)
-Call: method='sgcca', superblock=FALSE, scale=TRUE, scale_block='lambda1',
-init='svd', bias=TRUE, tol=1e-08, NA_method='na.ignore', ncomp=c(1,1,1),
-response=NULL, comp_orth=TRUE
-There are J = 3 blocks.
-The design matrix is:
-       methyl rnaseq mirna
-methyl      0      1     1
-rnaseq      1      0     1
-mirna       1      1     0
-
-The centroid scheme is used.
-Sum_{j,k} c_jk g(cov(X_j a_j, X_k a_k) = 0.1983
-
-The sparsity parameter used for methyl is: 0.08490206 (with 4523
-variables selected)
-The sparsity parameter used for rnaseq is: 0.09080668 (with 206
-variables selected)
-The sparsity parameter used for mirna is: 0.1354807 (with 10
-variables selected)
 
 
 
