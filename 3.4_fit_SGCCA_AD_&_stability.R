@@ -6,6 +6,8 @@
 # libraries
 library(RGCCA)        # ‘3.0.3’
 library(RhpcBLASctl)  # ‘0.23.42’
+library(tidyverse)
+library(parallel)     # ‘4.6.0’
 
 
 
@@ -82,34 +84,91 @@ fit_sgcca_AD$AVE
 # [1] 0.5568738
 
 
-boot_sgcca_AD <- rgcca_bootstrap(
-                  fit_sgcca_AD,
-                  n_boot             = 1000,
-                  n_cores            = 50,
-                  balanced           = TRUE,
-                  keep_all_variables = FALSE,
-                  verbose            = TRUE
-)
 
 
-plot(
-  boot_sgcca_AD, 
-  block = 1, 
-  n_mark = 4500, 
-  display_order = TRUE
-)
+
+# Select most stable variables
+
+blas_set_num_threads(6)
+omp_set_num_threads(6)
+
+# Make cluster
+num_cores <- 5
+cl <- makeCluster(num_cores)
+
+# Export vars into nodes
+clusterExport(cl, varlist = c("sgcca_AD_data", "design", "ncomp_permut_50", "penalties_permut_500"))
+
+# Load RGCCA package to each node
+clusterEvalQ(cl, library(RGCCA))
+
+# Function to parallelize
+run_sgcca_subsample <- function(i) {
+  
+  # Generar el submuestreo
+  random_subsample <- sample(
+    x    = 1:nrow(sgcca_AD_data[[1]]), 
+    size = (nrow(sgcca_AD_data[[1]]) / 2)
+  )
+  
+  subsample_data <- list(
+    methyl = sgcca_AD_data[["methyl"]][random_subsample, ],
+    rnaseq = sgcca_AD_data[["rnaseq"]][random_subsample, ],
+    mirna  = sgcca_AD_data[["mirna"]][random_subsample, ]
+  )
+  
+  # Check rownames between blocks match
+  if (
+    !identical(rownames(subsample_data[["methyl"]]), rownames(subsample_data[["rnaseq"]])) ||
+    !identical(rownames(subsample_data[["methyl"]]), rownames(subsample_data[["mirna"]]))
+  ) {
+    stop("rownames between blocks do not match")
+  }
+  
+  # Run SGCCA model (with random subsample, 50%)
+  sgcca_subsample <- rgcca(
+    blocks      = subsample_data,
+    connection  = design,
+    ncomp       = ncomp_permut_50$best_params,
+    sparsity    = penalties_permut_500$best_params,
+    scheme      = "centroid",
+    scale       = TRUE,
+    scale_block = "lambda1",
+    method      = "sgcca"
+  )
+  
+  # Get list of block weights
+  return(
+    
+    list(
+    methyl = sgcca_subsample$a$methyl,
+    rnaseq = sgcca_subsample$a$rnaseq,
+    mirna  = sgcca_subsample$a$mirna
+    )
+  
+  )
+}
+
+# Paralellize runs
+block_weights <- parLapply(cl, 1:100, run_sgcca_subsample)
+
+stopCluster(cl)
 
 
-fit_stab_sgcca_AD <- rgcca_stability(
-                      fit_sgcca_AD,
-               keep = sapply(fit_sgcca_AD$a, function(x) mean(x != 0)),
-            n_cores = 4, 
-             n_boot = 1000,
-            verbose = TRUE
-)
+# Get weights per omic block
+methyl_weights_AD <- do.call(cbind, lapply(block_weights, function(data) data.frame(weight = data$methyl)))
+rnaseq_weights_AD <- do.call(cbind, lapply(block_weights, function(data) data.frame(weight = data$rnaseq)))
+mirna_weights_AD  <- do.call(cbind, lapply(block_weights, function(data) data.frame(weight = data$mirna)))
 
 
-# Sigue bootstrap con fit_stab:
+
+
+
+
+
+
+
+
 
 
 
@@ -186,24 +245,85 @@ fit_sgcca_control$AVE
 # $AVE_inner
 # [1] 0.5341872
 
+                                           
+# Make cluster
+num_cores <- 5
+cl <- makeCluster(num_cores)
 
-boot_sgcca_control <- rgcca_bootstrap(
-                  fit_sgcca_control,
-                  n_boot             = 1000,
-                  n_cores            = 50,
-                  balanced           = TRUE,
-                  keep_all_variables = FALSE,
-                  verbose            = TRUE
-)
+# Export vars into nodes
+clusterExport(cl, varlist = c("sgcca_control_data", "design", "ncomp_permut_50", "penalties_permut_500"))
 
+# Load RGCCA package to each node
+clusterEvalQ(cl, library(RGCCA))
+
+# Function to parallelize
+run_sgcca_subsample <- function(i) {
   
-fit_stab_sgcca_control <- rgcca_stability(
-                      fit_sgcca_control,
-               keep = sapply(fit_sgcca_control$a, function(x) mean(x != 0)),
-            n_cores = 4, 
-             n_boot = 1000,
-            verbose = TRUE
-)
+  # Generar el submuestreo
+  random_subsample <- sample(
+    x    = 1:nrow(sgcca_control_data[[1]]), 
+    size = (nrow(sgcca_control_data[[1]]) / 2)
+  )
+  
+  subsample_data <- list(
+    methyl = sgcca_control_data[["methyl"]][random_subsample, ],
+    rnaseq = sgcca_control_data[["rnaseq"]][random_subsample, ],
+    mirna  = sgcca_control_data[["mirna"]][random_subsample, ]
+  )
+  
+  # Check rownames between blocks match
+  if (
+    !identical(rownames(subsample_data[["methyl"]]), rownames(subsample_data[["rnaseq"]])) ||
+    !identical(rownames(subsample_data[["methyl"]]), rownames(subsample_data[["mirna"]]))
+  ) {
+    stop("rownames between blocks do not match")
+  }
+  
+  # Run SGCCA model (with random subsample, 50%)
+  sgcca_subsample <- rgcca(
+    blocks      = subsample_data,
+    connection  = design,
+    ncomp       = ncomp_permut_50$best_params,
+    sparsity    = penalties_permut_500$best_params,
+    scheme      = "centroid",
+    scale       = TRUE,
+    scale_block = "lambda1",
+    method      = "sgcca"
+  )
+  
+  # Get list of block weights
+  return(
+    
+    list(
+    methyl = sgcca_subsample$a$methyl,
+    rnaseq = sgcca_subsample$a$rnaseq,
+    mirna  = sgcca_subsample$a$mirna
+    )
+  
+  )
+}
+
+# Paralellize runs
+block_weights_control <- parLapply(cl, 1:100, run_sgcca_subsample)
+
+stopCluster(cl)
+
+
+# Get weights per omic block
+methyl_weights_control <- do.call(cbind, lapply(block_weights_control, function(data) data.frame(weight = data$methyl)))
+rnaseq_weights_control <- do.call(cbind, lapply(block_weights_control, function(data) data.frame(weight = data$rnaseq)))
+mirna_weights_contorl  <- do.call(cbind, lapply(block_weights_control, function(data) data.frame(weight = data$mirna)))
+
+
+
+
+
+
+
+
+                                           
+
+
 
 
 
