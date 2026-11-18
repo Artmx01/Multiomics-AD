@@ -274,7 +274,56 @@ stable_features_AD_data_Networks <- fit_sgcca_AD_stab_features$blocks
 # transpose blocks
 stable_features_AD_data_Networks <- lapply(stable_features_AD_data_Networks, t)
 
-# Save data
+# 1. Get methyl block and save it as a tsv format (with rownames as a column)
+methyl_AD_data_networks <- stable_features_AD_data_Networks$methyl
+
+methyl_AD_data_networks <- data.frame(
+                                 gene = rownames(methyl_AD_data_networks),
+                                        as.data.frame(methyl_AD_data_networks),
+                            row.names = NULL
+                          )
+# Quality Check
+identical(rownames(stable_features_AD_data_Networks$methyl), methyl_AD_data_networks$gene)
+# [1] TRUE
+
+# Save methyl AD data
+write_tsv(x = methyl_AD_data_networks, file = "methyl_AD_data_networks.tsv")
+
+
+# 2. Get rnaseq block and save it as a tsv format (with rownames as a column)
+
+rnaseq_AD_data_networks <- stable_features_AD_data_Networks$rnaseq
+
+rnaseq_AD_data_networks <- data.frame(
+                                 gene = rownames(rnaseq_AD_data_networks),
+                                        as.data.frame(rnaseq_AD_data_networks),
+                            row.names = NULL
+                          )
+
+identical(rownames(stable_features_AD_data_Networks$rnaseq), rnaseq_AD_data_networks$gene)
+# [1] TRUE
+
+# Save rnaseq AD data
+write_tsv(x = rnaseq_AD_data_networks, file = "rnaseq_AD_data_networks.tsv")
+
+
+# 3. Get mirna block and save it as a tsv format (with rownames as a column)
+
+mirna_AD_data_networks <- stable_features_AD_data_Networks$mirna
+
+mirna_AD_data_networks <- data.frame(
+                                 gene = rownames(mirna_AD_data_networks),
+                                        as.data.frame(mirna_AD_data_networks),
+                            row.names = NULL
+                          )
+
+identical(rownames(stable_features_AD_data_Networks$mirna), mirna_AD_data_networks$gene)
+# [1] TRUE
+
+# Save mirna AD data
+write_tsv(x = mirna_AD_data_networks, file = "mirna_AD_data_networks.tsv")
+
+# Save all AD data (stable features)
 saveRDS(object = stable_features_AD_data_Networks, file = "stable_features_AD_data_Networks.rds")
 
 
@@ -312,8 +361,59 @@ stable_features_control_data_Networks <- fit_sgcca_control_stab_features$blocks
 # transpose blocks
 stable_features_control_data_Networks <- lapply(stable_features_control_data_Networks, t)
 
-# Save data
+# 1. Get methyl block and save it as a tsv format (with rownames as a column)
+methyl_control_data_networks <- stable_features_control_data_Networks$methyl
+
+methyl_control_data_networks <- data.frame(
+                                 gene = rownames(methyl_control_data_networks),
+                                        as.data.frame(methyl_control_data_networks),
+                            row.names = NULL
+                          )
+
+identical(rownames(stable_features_control_data_Networks$methyl), methyl_control_data_networks$gene)
+# [1] TRUE
+
+# Save methyl control data
+write_tsv(x = methyl_control_data_networks, file = "methyl_control_data_networks.tsv")
+
+
+# 2. Get rnaseq block and save it as a tsv format (with rownames as a column)
+rnaseq_control_data_networks <- stable_features_control_data_Networks$rnaseq
+
+rnaseq_control_data_networks <- data.frame(
+                                 gene = rownames(rnaseq_control_data_networks),
+                                        as.data.frame(rnaseq_control_data_networks),
+                            row.names = NULL
+                          )
+
+identical(rownames(stable_features_control_data_Networks$rnaseq), rnaseq_control_data_networks$gene)
+# [1] TRUE
+
+# Save rnaseq control data
+write_tsv(x = rnaseq_control_data_networks, file = "rnaseq_control_data_networks.tsv")
+
+
+# 3. Get mirna block and save it as a tsv format (with rownames as a column)
+mirna_control_data_networks <- stable_features_control_data_Networks$mirna
+
+mirna_control_data_networks <- data.frame(
+                                 gene = rownames(mirna_control_data_networks),
+                                        as.data.frame(mirna_control_data_networks),
+                            row.names = NULL
+                          )
+
+identical(rownames(stable_features_control_data_Networks$mirna), mirna_control_data_networks$gene)
+# [1] TRUE
+
+# Save rnaseq control data
+write_tsv(x = mirna_control_data_networks, file = "mirna_control_data_networks.tsv")
+
+
+# Save all control data (stable features)
 saveRDS(object = stable_features_control_data_Networks, file = "stable_features_control_data_Networks.rds")
+
+
+
 
 
 
