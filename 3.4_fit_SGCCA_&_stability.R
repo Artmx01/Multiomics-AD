@@ -253,21 +253,34 @@ stable_features_AD_data <- list(
                             mirna  = mirna_AD_data[, mirna_stable_AD]
                            )
 
-# Opcional
+
+
+# Fit sgcca with stable features (AD)
 fit_sgcca_AD_stab_features <- rgcca(
   blocks      = stable_features_AD_data,
   connection  = design,
   ncomp       = ncomp_permut_50$best_params,
-  sparsity    = 1, # All variables
+  sparsity    = 1, # Keep all variables
   scheme      = "centroid",
   scale       = TRUE,
   scale_block = "lambda1",
   method      = "sgcca"
 )
 
+# Extract data blocks from fitted model:
+# These blocks are preprocessed according to the values of scale/scale_block/NA_method
+stable_features_AD_data_Networks <- fit_sgcca_AD_stab_features$blocks
+
+# transpose blocks
+stable_features_AD_data_Networks <- lapply(stable_features_AD_data_Networks, t)
+
+# Save data
+saveRDS(object = stable_features_AD_data_Networks, file = "stable_features_AD_data_Networks.rds")
+
+
+
 
 # Get stable features data (control) for network reconstruction
-
 
 CpGs_stable_control <- stable_features_control_df %>% filter(block == "methyl") %>% pull(var)
 rnaseq_stable_control <- stable_features_control_df %>% filter(block == "rnaseq") %>% pull(var)
@@ -279,17 +292,50 @@ stable_features_control_data <- list(
                                   mirna  = mirna_control_data[, mirna_stable_control]
                                 )
 
-# Opcional
+
+# Fit sgcca with stable features (control)
 fit_sgcca_control_stab_features <- rgcca(
   blocks      = stable_features_control_data,
   connection  = design,
   ncomp       = ncomp_permut_50$best_params,
-  sparsity    = 1, # All variables
+  sparsity    = 1, # Keep all variables
   scheme      = "centroid",
   scale       = TRUE,
   scale_block = "lambda1",
   method      = "sgcca"
 )
+
+# Extract data blocks from fitted model:
+# These blocks are preprocessed according to the values of scale/scale_block/NA_method
+stable_features_control_data_Networks <- fit_sgcca_control_stab_features$blocks
+
+# transpose blocks
+stable_features_control_data_Networks <- lapply(stable_features_control_data_Networks, t)
+
+# Save data
+saveRDS(object = stable_features_control_data_Networks, file = "stable_features_control_data_Networks.rds")
+
+
+
+# Venn Diagram of features selected by SGCCA in AD & control:
+
+library(ggVennDiagram) # ‘1.5.7’
+library(ggplot2)       # ‘4.0.3’
+
+
+# Features stable in AD
+stable_features_AD_names <- c(CpGs_stable_AD, rnaseq_stable_AD, mirna_stable_AD)
+
+# Features stable in control
+stable_features_control_names <- c(CpGs_stable_control, rnaseq_stable_control, mirna_stable_control)
+
+# Venn diagram data
+Venn_data <- list(AD = stable_features_AD_names, noAD = stable_features_control_names)
+
+# Plot and save Venn diagram
+pdf("VennDiagram_AD_noAD_features_selected.pdf")
+ggVennDiagram(Venn_data)
+dev.off()
 
                                       
 
