@@ -468,39 +468,236 @@ array_meth_metadata <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/methyl_dat
 
 
 
-# 1. Format AD data to functional enrichment
+# 1. AD data formatting (entrezIDs) for functional enrichment
 
-methyl_AD_genes <- array_meth_metadata %>% filter(TargetID %in% rownames(stable_features_AD_data$methyl)) %>% filter(!is.na(RefGene)) %>% pull(RefGene)
+# Methyl AD data
+methyl_AD_genes <- array_meth_metadata %>%
+                    filter(TargetID %in% rownames(stable_features_AD_data$methyl)) %>%
+                    filter(!is.na(RefGene)) %>%
+                    pull(RefGene) %>%
+                    str_split(string = ., pattern = ";") %>% 
+                    unlist
+
+methyl_AD_entrezID <- bitr(
+                        geneID   = methyl_AD_genes,
+                        fromType = "SYMBOL", 
+                        toType   = "ENTREZID", 
+                        OrgDb    = org.Hs.eg.db
+                      )
+# 'select()' returned 1:1 mapping between keys and columns
+# Aviso:
+# In bitr(geneID = methyl_AD_genes, fromType = "SYMBOL", toType = "ENTREZID",  :
+#  14.73% of input gene IDs are fail to map...
+
+# Extract genes that failed to map
+methyl_AD_genes_no_mapped <- setdiff(methyl_AD_genes,methyl_AD_entrezID$SYMBOL)
+# length(methyl_AD_genes_no_mapped)
+# [1] 450
+
+# Get entrezID of genes that do not mapped with "ALIAS"
+methyl_AD_entrezID_genes_no_mapped <- bitr(
+                                        geneID   = methyl_AD_genes_no_mapped,
+                                        fromType = "ALIAS", 
+                                        toType   = "ENTREZID", 
+                                        OrgDb    = org.Hs.eg.db
+                                    )
+# 'select()' returned 1:many mapping between keys and columns
+# Aviso:
+# In bitr(geneID = methyl_AD_genes_no_mapped, fromType = "ALIAS",  :
+#  14.44% of input gene IDs are fail to map...
+#
+# length(setdiff(methyl_AD_genes_no_mapped, methyl_AD_entrezID_genes_no_mapped$ALIAS))
+# [1] 65
+
+# Remove duplicates
+methyl_AD_entrezID_genes_no_mapped <- methyl_AD_entrezID_genes_no_mapped[!duplicated(methyl_AD_entrezID_genes_no_mapped$ALIAS),]
+
+# Merge results
+colnames(methyl_AD_entrezID_genes_no_mapped)[1] <- "SYMBOL"
+
+methyl_AD_entrezID <- rbind(methyl_AD_entrezID, methyl_AD_entrezID_genes_no_mapped)
+# dim(methyl_AD_entrezID)
+# [1] 2991    2
+
+
+# RNAseq AD data
+rnaseq_AD_entrezID <- bitr(
+                        geneID   = rownames(stable_features_AD_data$rnaseq), 
+                        fromType = "ENSEMBL", 
+                        toType   = "ENTREZID", 
+                        OrgDb    = org.Hs.eg.db
+                      )
+# 'select()' returned 1:many mapping between keys and columns
+# Aviso:
+# In bitr(geneID = rownames(stable_features_AD_data$rnaseq), fromType = "ENSEMBL",  :
+#  0.96% of input gene IDs are fail to map...
+
+# setdiff(rownames(stable_features_AD_data$rnaseq), rnaseq_AD_entrezID$ENSEMBL)
+# [1] "ENSG00000270607" "ENSG00000260816"
+
+
+# miRNA AD data
+
+mirna_AD_genes <- rownames(stable_features_AD_data$mirna)
+# mirna_AD_genes
+# [1] "hsa-miR-129-5p" "hsa-miR-132"    "hsa-miR-193b"   "hsa-miR-200a"
+# [5] "hsa-miR-633"    "hsa-miR-744"    "hsa-miR-1260"   "hsa-miR-1275"
+
+# HGNC format:
+mirna_AD_genes <- c("MIR129-1", "MIR129-2", "MIR132", "MIR193B", "MIR200A", "MIR633", "MIR744", "MIR1260A", "MIR1275")
+
+mirna_AD_entrezID <- bitr(
+                        geneID   = mirna_AD_genes, 
+                        fromType = "SYMBOL", 
+                        toType   = "ENTREZID", 
+                        OrgDb    = org.Hs.eg.db
+                      )
+# 'select()' returned 1:1 mapping between keys and columns
+
+# Merge all entrezIDs (from each AD block)
+AD_genes <- unique(c(methyl_AD_entrezID$ENTREZID, rnaseq_AD_entrezID$ENTREZID, mirna_AD_entrezID$ENTREZID))
+
+length(AD_genes)
+# [1] 3171 // For compareCluster
 
 
 
-# 2. Format control data to functional enrichment
+# 2. Control data formatting for functional enrichment
 
-methyl_control_genes <- array_meth_metadata %>% filter(TargetID %in% rownames(stable_features_control_data$methyl)) %>% filter(!is.na(RefGene)) %>% pull(RefGene)
+# Methyl control data
+methyl_control_genes <- array_meth_metadata %>% 
+                          filter(TargetID %in% rownames(stable_features_control_data$methyl)) %>%
+                          filter(!is.na(RefGene)) %>%
+                          pull(RefGene) %>%
+                          str_split(string = ., pattern = ";") %>% 
+                          unlist
+
+methyl_control_entrezID <- bitr(
+                            geneID   = methyl_control_genes,
+                            fromType = "SYMBOL", 
+                            toType   = "ENTREZID", 
+                            OrgDb    = org.Hs.eg.db
+                          )
+# 'select()' returned 1:many mapping between keys and columns
+# Aviso:
+# In bitr(geneID = methyl_control_genes, fromType = "SYMBOL", toType = "ENTREZID",  :
+#  14.59% of input gene IDs are fail to map...
+
+# Remove duplicates
+methyl_control_entrezID <- methyl_control_entrezID[!duplicated(methyl_control_entrezID$SYMBOL), ]
+
+# Extract genes that failed to map
+methyl_control_genes_no_mapped <- setdiff(methyl_control_genes, methyl_control_entrezID$SYMBOL)
+# length(methyl_control_genes_no_mapped)
+# [1] 468
+
+# Get entrezID of genes that do not mapped with "ALIAS"
+methyl_control_entrezID_genes_no_mapped <- bitr(
+                                            geneID   = methyl_control_genes_no_mapped,
+                                            fromType = "ALIAS", 
+                                            toType   = "ENTREZID", 
+                                            OrgDb    = org.Hs.eg.db
+                                          )
+# 'select()' returned 1:many mapping between keys and columns
+# Aviso:
+# In bitr(geneID = methyl_control_genes_no_mapped, fromType = "ALIAS",  :
+#  14.74% of input gene IDs are fail to map...
+#
+# length(setdiff(methyl_control_genes_no_mapped, methyl_control_entrezID_genes_no_mapped$ALIAS))
+# [1] 69
+
+# Remove duplicates
+methyl_control_entrezID_genes_no_mapped <- methyl_control_entrezID_genes_no_mapped[!duplicated(methyl_control_entrezID_genes_no_mapped$ALIAS), ]
+
+# Merge results
+colnames(methyl_control_entrezID_genes_no_mapped)[1] <- "SYMBOL"
+
+methyl_control_entrezID <- rbind(methyl_control_entrezID, methyl_control_entrezID_genes_no_mapped)
+# dim(methyl_control_entrezID)
+# [1] 3139    2
+
+# RNAseq control data
+rnaseq_control_entrezID <- bitr(
+                            geneID   = rownames(stable_features_control_data$rnaseq), 
+                            fromType = "ENSEMBL", 
+                            toType   = "ENTREZID", 
+                            OrgDb    = org.Hs.eg.db
+                          )
+# 'select()' returned 1:many mapping between keys and columns
+# Aviso:
+# In bitr(geneID = rownames(stable_features_control_data$rnaseq),  :
+#  4.37% of input gene IDs are fail to map...
+#
+# length(setdiff(rownames(stable_features_control_data$rnaseq), rnaseq_control_entrezID$ENSEMBL))
+# [1] 9
+
+
+# miRNA AD data
+
+mirna_control_genes <- rownames(stable_features_control_data$mirna)
+# mirna_control_genes
+# [1] "hsa-miR-16"     "hsa-miR-103"    "hsa-miR-106b"   "hsa-miR-140-5p"
+# [5] "hsa-miR-195"    "hsa-miR-497"    "hsa-miR-515-3p" "hsa-miR-627"
+# [9] "ebv-miR-BART5"  "kshv-miR-K12-2"
+# last 2 comes from viral sequences
+
+# HGNC format:
+mirna_control_genes <- c("MIR16-1", "MIR16-2", "MIR103A1","MIR103A2", "MIR106B", "MIR140", "MIR195", "MIR497", "MIR515-1", "MIR515-2", "MIR627")
+
+mirna_control_entrezID <- bitr(
+                            geneID   = mirna_control_genes, 
+                            fromType = "SYMBOL", 
+                            toType   = "ENTREZID", 
+                            OrgDb    = org.Hs.eg.db
+                          )
+# 'select()' returned 1:1 mapping between keys and columns
+
+# Merge all entrezIDs (from each control block)
+control_genes <- unique(c(methyl_control_entrezID$ENTREZID, rnaseq_control_entrezID$ENTREZID, mirna_control_entrezID$ENTREZID))
+
+length(control_genes)
+# [1] 3318
+
+
 
 # 3. Functional enrichment Analysis
+enrich_BP <- compareCluster(
+              geneClusters  = list(AD = AD_genes, Control = control_genes),
+	            fun           = "enrichGO",
+	            OrgDb         = org.Hs.eg.db,
+	            ont           = "BP",
+            	readable      = TRUE,
+            	pAdjustMethod = "fdr",
+              pvalueCutoff  = 0.05
+          )
+
+enrich_KEGG <- compareCluster(
+              geneClusters  = list(AD = AD_genes, Control = control_genes),
+	            fun           = "enrichKEGG",
+	            organism      = "hsa",
+            	pAdjustMethod = "fdr",
+              pvalueCutoff  = 0.05
+          )
 
 
 
+enrich_BP_pval.01 <- compareCluster(
+              geneClusters  = list(AD = AD_genes, Control = control_genes),
+	            fun           = "enrichGO",
+	            OrgDb         = org.Hs.eg.db,
+	            ont           = "BP",
+            	readable      = TRUE,
+            	pAdjustMethod = "fdr",
+              pvalueCutoff  = 0.01
+          )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+enrich_KEGG_pval.01 <- compareCluster(
+              geneClusters  = list(AD = AD_genes, Control = control_genes),
+	            fun           = "enrichKEGG",
+	            organism      = "hsa",
+            	pAdjustMethod = "fdr",
+              pvalueCutoff  = 0.01
+          )
 
 
 
