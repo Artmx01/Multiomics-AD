@@ -437,7 +437,70 @@ pdf("VennDiagram_AD_noAD_features_selected.pdf")
 ggVennDiagram(Venn_data)
 dev.off()
 
-                                      
+
+
+
+
+###############################
+# Functional Enrichment script
+###############################
+
+library(clusterProfiler) # ‘4.20.3’
+library(biomaRt)         # ‘2.68.0’
+library(vroom)           # ‘1.7.1’
+library(org.Hs.eg.db)    # ‘3.23.1’
+library(tidyverse)       # ‘2.0.0’
+
+
+
+
+
+
+# Load  AD data (stable features from SGCCA):
+stable_features_AD_data <- readRDS(file = "../networks/stable_features_AD_data_Networks.rds")
+
+# Load control data (stable features from SGCCA):
+stable_features_control_data <- readRDS(file = "../networks/stable_features_control_data_Networks.rds")
+
+#Load methyl array metadata
+array_meth_metadata <- vroom(file = "/STORAGE/csbig/multiomics-Arturo/methyl_data/metadata/ROSMAP_arrayMethylation_metaData.tsv")
+
+
+
+
+# 1. Format AD data to functional enrichment
+
+methyl_AD_genes <- array_meth_metadata %>% filter(TargetID %in% rownames(stable_features_AD_data$methyl)) %>% filter(!is.na(RefGene)) %>% pull(RefGene)
+
+
+
+# 2. Format control data to functional enrichment
+
+methyl_control_genes <- array_meth_metadata %>% filter(TargetID %in% rownames(stable_features_control_data$methyl)) %>% filter(!is.na(RefGene)) %>% pull(RefGene)
+
+# 3. Functional enrichment Analysis
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
